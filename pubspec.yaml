@@ -11,7 +11,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: ">=2.18.0 <3.0.0"
+  sdk: ">=3.0.0 <4.0.0"
 
 dependencies:
   flutter:
@@ -21,11 +21,13 @@ dependencies:
   table_calendar: ^3.0.0
   http: ^1.3.0
   month_picker_dialog: ^2.0.1
-  google_fonts: ^6.1.0  # Check for latest version
+  google_fonts: 6.3.2  # Pinned: needs Dart >=3.7; 6.3.3+ needs 3.9 (breaks CI Flutter 3.32.4), 6.2.1 fails Dart 3.12 const-eval
   pdf: ^3.8.4
   path_provider: ^2.1.2  # For saving files
   open_file: ^3.0.3
   image_picker: ^1.0.4
+  firebase_core: ^4.11.0
+  firebase_auth: ^6.5.4
 
 
 dev_dependencies:

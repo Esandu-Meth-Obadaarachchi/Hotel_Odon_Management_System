@@ -67,6 +67,7 @@ lib/
 │   │   ├── calculate_profit_page.dart
 │   │   ├── expenses_screen.dart
 │   │   ├── ViewEditSalariesExpensesScreen.dart
+│   │   ├── bulk_import.dart           # Paste-from-Claude JSON parser for salaries/expenses
 │   │   └── price_settings_screen.dart
 │   ├── invoices/
 │   │   ├── generate_invoice_screen.dart
@@ -317,8 +318,35 @@ Available package types: `Full Board`, `Half Board`, `Room Only`, `BnB`, `Dinner
 - Check-in time is fixed at **2:00 PM**, check-out at **11:00 AM** — displayed inline on the PDF.
 - Extra hour charge note (LKR 1,000/hr) appears in red below the stay info.
 - Guest phone number is optional — shown under guest name in "BILL TO" if provided.
+- **NIC field** (optional) on the invoice form — included in the WhatsApp summary message when filled.
 - Fixed notes use `-` instead of `•` bullets because Helvetica has no Unicode bullet support.
 - Uses `pw.Font.helvetica()` built-in fonts. Do NOT swap to TTF via `rootBundle` — font files are declared under `fonts:` not `assets:` in pubspec.yaml so rootBundle cannot load them.
+
+### Invoice Ready dialog (`_showInvoiceReadyDialog`)
+
+Once `invoice.generateInvoice()` returns, the screen shows a dialog with:
+- **Share PDF** (web only, via `file_saver.sharePdfLast()`) — uses the Web Share API with a real `html.File` so iOS Safari can hand the PDF to WhatsApp / Mail with the right filename and **without** leaking the page URL as a caption (which is what happens when sharing a `blob:` URL from Safari's PDF viewer).
+- **Open PDF** (web only, via `file_saver.openPdfUrl(url)`) — opens the blob URL in a new tab. On iOS Safari this must be triggered from a fresh user gesture (the dialog button), not from inside the async PDF build.
+- **WhatsApp message** — a copy-able summary built from the form by `_buildWhatsAppSummary` (guest, date(s), nights, package, room counts, totals + advance + remaining). A "Copy Message" button puts it on the clipboard so it can be pasted into the guest's WhatsApp chat.
+
+### file_saver public API (`lib/core/utils/file_saver.dart`)
+
+The conditional export (web/mobile/stub) exposes three functions:
+- `Future<String?> saveAndOpenPdf(List<int> bytes, String fileName)` — writes the PDF; on web returns the blob URL (and stashes the bytes for `sharePdfLast`), on mobile opens the file via `open_file` and returns `null`. **Wraps bytes in `Uint8List.fromList()` on web** so the Blob receives a real `ArrayBufferView`; passing a plain `List<int>` serialises as a JS Array and produces a corrupt PDF.
+- `void openPdfUrl(String url)` — opens a URL in a new tab on web; no-op on mobile.
+- `Future<bool> sharePdfLast()` — Web Share API for the last saved PDF; returns `false` if the browser doesn't support sharing files.
+
+## Bulk Import (Paste from Claude JSON)
+
+`lib/features/financials/bulk_import.dart` lets staff paste a JSON block produced by the in-app Claude prompt (the one wired into the AI insights flow) and bulk-create salaries / expenses through the existing review-and-save flow.
+
+**Where**: a `_PasteBanner` on `lib/features/financials/expenses_screen.dart` labelled "Paste month JSON from Claude" opens the paste dialog and routes results into the same `DataConfirmationDialog` the OCR/import flow uses.
+
+**Parser** (`parseBulkImportJson(String raw)`):
+- Strips ` ```json … ``` ` code fences Claude chat often wraps output in.
+- Accepts either `{ "salaries": [ ... ], "expenses": [ ... ] }` or a bare list of items with a recognisable `type` field.
+- Salary types are clamped to `kSalaryTypes` (`OT` / `Monthly` / `Weekly` / `Commission`) and expense categories to `kExpenseCategories` (`Food` / `Utilities` / `Maintenance` / `Supplies` / `Transportation` / `Marketing` / `Equipment` / `Other`), so an out-of-range JSON value can never reach the edit dialog's dropdowns.
+- Throws `FormatException` with a friendly message on bad input (empty paste, invalid JSON, etc.).
 
 ## Switching Between Local and Production Backend
 

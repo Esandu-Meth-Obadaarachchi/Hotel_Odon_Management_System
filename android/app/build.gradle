@@ -43,7 +43,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.odon_booking"
-        minSdk = flutter.minSdkVersion
+        minSdk = 23 // firebase_auth requires minSdk 23 (raised from flutter.minSdkVersion)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutterVersionCode.toInteger()
         versionName = flutterVersionName
