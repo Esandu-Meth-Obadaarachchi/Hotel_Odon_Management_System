@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:odon_booking/core/api/api_service.dart';
+import 'package:odon_booking/features/invoices/booking_invoice.dart';
 import 'edit_booking_screen.dart';
 import 'future_bookings_screen.dart';
 import 'past_bookings_screen.dart';
@@ -434,6 +435,19 @@ class _ViewBookingsScreenState extends State<ViewBookingsScreen> {
                   ),
                 ),
                 IconButton(
+                  tooltip: 'Share invoice',
+                  icon: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade600,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.ios_share_rounded, color: Colors.white, size: 16),
+                  ),
+                  onPressed: () => shareBookingInvoice(context, booking),
+                ),
+                IconButton(
+                  tooltip: 'Edit booking',
                   icon: Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
