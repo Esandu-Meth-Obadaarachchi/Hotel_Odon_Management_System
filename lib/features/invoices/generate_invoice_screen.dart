@@ -6,6 +6,7 @@ import 'invoice.dart' as invoice;
 import 'package:odon_booking/core/api/api_service.dart';
 import 'package:odon_booking/core/utils/file_saver.dart' as file_saver;
 import 'package:odon_booking/features/financials/price_settings_screen.dart';
+import 'package:odon_booking/features/bookings/room_selection_screen.dart';
 
 class Room {
   String type;
@@ -1366,6 +1367,37 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
     _showInvoiceReadyDialog(summaryMessage, pdfUrl);
   }
 
+  /// Maps the invoice's package names to the booking system's package names
+  /// and returns a prefill map consumed by [RoomSelectionScreen].
+  Map<String, dynamic> _buildBookingPrefill() {
+    const pkgMap = {
+      'Full Board': 'Full Board',
+      'Half Board': 'Half Board',
+      'Room Only': 'Room Only',
+      'Bed and Breakfast': 'BnB',
+      'Room + Dinner': 'Dinner Only',
+    };
+
+    final mappedPackage = _customizePackages ? null : pkgMap[_packageType];
+    final startMeal = (!_customizePackages &&
+            (_packageType == 'Full Board' || _packageType == 'Half Board'))
+        ? _startMeal
+        : null;
+
+    return {
+      'guestName': _nameController.text,
+      'guestPhone': _phoneController.text,
+      'checkIn': _checkInDate,
+      'checkOut': _checkOutDate,
+      'package': mappedPackage,
+      'mealStart': startMeal,
+      'total': _totalAmount.toStringAsFixed(2),
+      'advance': _advanceAmount.toStringAsFixed(2),
+      'needDriver': _includeDriverRoom,
+      'extraDetails': _specialNotesController.text,
+    };
+  }
+
   String _buildWhatsAppSummary(NumberFormat fmt) {
     final nights = _checkOutDate!.difference(_checkInDate!).inDays;
 
@@ -1488,8 +1520,31 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                         onPressed: () => file_saver.openPdfUrl(pdfUrl),
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 8),
                   ],
+                  // Add this invoice to the booking system
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.hotel_rounded, size: 18),
+                      label: const Text('Add Booking to System'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.green.shade700,
+                        side: BorderSide(color: Colors.green.shade300),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      onPressed: () {
+                        Navigator.of(ctx).pop();
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                RoomSelectionScreen(prefill: _buildBookingPrefill()),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   Text(
                     'WHATSAPP MESSAGE',
                     style: TextStyle(
