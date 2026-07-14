@@ -4,6 +4,14 @@ import 'package:odon_booking/core/api/api_service.dart';
 import 'package:odon_booking/features/guests/widgets/guest_name_autocomplete.dart';
 
 class RoomSelectionScreen extends StatefulWidget {
+  /// Optional prefill data (e.g. coming from the Generate Invoice screen).
+  /// Recognised keys: guestName, guestPhone (String); checkIn, checkOut
+  /// (DateTime); package, mealStart (String); total, advance, extraDetails
+  /// (String); needDriver (bool).
+  final Map<String, dynamic>? prefill;
+
+  RoomSelectionScreen({this.prefill});
+
   @override
   _RoomSelectionScreenState createState() => _RoomSelectionScreenState();
 }
@@ -35,6 +43,41 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
   void initState() {
     super.initState();
     _fetchRoomConfig();
+    _applyPrefill();
+  }
+
+  void _applyPrefill() {
+    final p = widget.prefill;
+    if (p == null) return;
+
+    _guestNameController.text = (p['guestName'] as String?) ?? '';
+    _guestPhoneController.text = (p['guestPhone'] as String?) ?? '';
+    if (p['total'] != null) _totalCostController.text = p['total'].toString();
+    if (p['advance'] != null) _advanceAmountController.text = p['advance'].toString();
+    if (p['extraDetails'] != null) {
+      _extraDetailsController.text = p['extraDetails'].toString();
+    }
+
+    const validPackages = ['Full Board', 'Half Board', 'Room Only', 'BnB', 'Dinner Only'];
+    final pkg = p['package'] as String?;
+    if (pkg != null && validPackages.contains(pkg)) {
+      _packageType = pkg;
+      if (pkg == 'Full Board' || pkg == 'Half Board') {
+        final meal = p['mealStart'] as String?;
+        if (meal == 'Lunch' || meal == 'Dinner') _mealStart = meal;
+      }
+    }
+
+    _needDriver = p['needDriver'] == true;
+
+    final ci = p['checkIn'];
+    final co = p['checkOut'];
+    if (ci is DateTime && co is DateTime) {
+      _checkInDate = ci;
+      _checkOutDate = co;
+      _numOfNights = co.difference(ci).inDays;
+      _fetchBookingsForDateRange();
+    }
   }
 
   Future<void> _fetchRoomConfig() async {
@@ -691,6 +734,36 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // ── Prefilled-from-invoice banner ─────────────────
+                        if (widget.prefill != null) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.shade50,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.amber.shade300),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.auto_awesome_rounded,
+                                    size: 18, color: Colors.amber.shade800),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    'Details prefilled from the invoice. Just select the room(s) below and save.',
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.amber.shade900,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                        ],
+
                         // ── Guest details ─────────────────────────────────
                         _sectionLabel('Guest Details'),
                         const SizedBox(height: 10),
