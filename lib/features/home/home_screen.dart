@@ -235,29 +235,27 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
+    final wide = _isWide(MediaQuery.of(context).size.width);
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
+      // Phones reach the actions from the bottom bar instead of a tile grid.
+      bottomNavigationBar: wide ? null : _bottomBar(),
       body: RefreshIndicator(
         onRefresh: _fetchData,
         child: _loading
             ? const Center(child: CircularProgressIndicator())
-            : LayoutBuilder(
-                builder: (context, constraints) {
-                  final wide = _isWide(constraints.maxWidth);
-                  return CustomScrollView(
-                    slivers: [
-                      _appBar(),
-                      SliverToBoxAdapter(
-                        child: Center(
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: _maxContentWidth),
-                            child: wide ? _wideBody() : _narrowBody(),
-                          ),
-                        ),
+            : CustomScrollView(
+                slivers: [
+                  _appBar(),
+                  SliverToBoxAdapter(
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: _maxContentWidth),
+                        child: wide ? _wideBody() : _narrowBody(),
                       ),
-                    ],
-                  );
-                },
+                    ),
+                  ),
+                ],
               ),
       ),
     );
@@ -271,7 +269,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           _statsRow(),
           _roomMap(wrapTiles: false),
           _mealSection(),
-          _quickActions(),
           const SizedBox(height: 24),
         ],
       );
@@ -771,25 +768,35 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   // ── Quick actions ─────────────────────────────────────────────────────────
 
+  /// The four the front desk uses all day — these get the bottom bar slots.
+  static final List<_QuickAction> _primaryActions = [
+    _QuickAction('New Booking', Icons.add_circle_rounded, const Color(0xFF4F46E5),
+        () => RoomSelectionScreen()),
+    _QuickAction('Bookings', Icons.calendar_month_rounded, const Color(0xFF16A34A),
+        () => ViewBookingsScreen()),
+    _QuickAction('Invoice', Icons.receipt_long_rounded, const Color(0xFFEF4444),
+        () => GenerateInvoiceScreen()),
+    _QuickAction('Inventory', Icons.inventory_2_rounded, const Color(0xFFF59E0B),
+        () => AddInventoryItemScreen()),
+  ];
+
+  /// Everything else — behind "More" on phones, in the grid on desktop.
+  static final List<_QuickAction> _moreActions = [
+    _QuickAction('Guests', Icons.people_alt_rounded, const Color(0xFFDB2777),
+        () => const GuestsListScreen()),
+    _QuickAction('Profit', Icons.analytics_rounded, const Color(0xFF8B5CF6),
+        () => CalculateProfitPage()),
+    _QuickAction('Expenses', Icons.attach_money_rounded, const Color(0xFF0891B2),
+        () => ExpensesAndSalaryScreen()),
+    _QuickAction('Room Config', Icons.meeting_room_rounded, const Color(0xFF475569),
+        () => RoomConfigScreen()),
+  ];
+
+  void _open(_QuickAction a) => Navigator.push(
+      context, MaterialPageRoute(builder: (_) => a.builder()));
+
   Widget _quickActions() {
-    final actions = <_QuickAction>[
-      _QuickAction('New Booking', Icons.add_circle_rounded, const Color(0xFF4F46E5),
-          () => RoomSelectionScreen()),
-      _QuickAction('Bookings', Icons.calendar_month_rounded, const Color(0xFF16A34A),
-          () => ViewBookingsScreen()),
-      _QuickAction('Guests', Icons.people_alt_rounded, const Color(0xFFDB2777),
-          () => const GuestsListScreen()),
-      _QuickAction('Inventory', Icons.inventory_2_rounded, const Color(0xFFF59E0B),
-          () => AddInventoryItemScreen()),
-      _QuickAction('Profit', Icons.analytics_rounded, const Color(0xFF8B5CF6),
-          () => CalculateProfitPage()),
-      _QuickAction('Invoice', Icons.receipt_long_rounded, const Color(0xFFEF4444),
-          () => GenerateInvoiceScreen()),
-      _QuickAction('Expenses', Icons.attach_money_rounded, const Color(0xFF0891B2),
-          () => ExpensesAndSalaryScreen()),
-      _QuickAction('Room Config', Icons.meeting_room_rounded, const Color(0xFF475569),
-          () => RoomConfigScreen()),
-    ];
+    final actions = [..._primaryActions, ..._moreActions];
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -822,8 +829,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         shadowColor: Colors.black.withValues(alpha: 0.18),
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
-          onTap: () => Navigator.push(
-              context, MaterialPageRoute(builder: (_) => a.builder())),
+          onTap: () => _open(a),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 6),
             child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -845,6 +851,102 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis),
             ]),
+          ),
+        ),
+      );
+
+  // ── Bottom action bar (phones) ─────────────────────────────────────────────
+
+  Widget _bottomBar() => Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 12, offset: const Offset(0, -2))],
+        ),
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            height: 62,
+            child: Row(
+              children: [
+                ..._primaryActions.map((a) => _bottomBarItem(
+                    a.label, a.icon, a.color, () => _open(a))),
+                _bottomBarItem('More', Icons.grid_view_rounded,
+                    const Color(0xFF64748B), _showMoreSheet),
+              ],
+            ),
+          ),
+        ),
+      );
+
+  Widget _bottomBarItem(String label, IconData icon, Color color, VoidCallback onTap) =>
+      Expanded(
+        child: InkWell(
+          onTap: onTap,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: color, size: 23),
+              const SizedBox(height: 3),
+              Text(label,
+                  style: TextStyle(
+                      fontSize: 10, fontWeight: FontWeight.w600, color: color),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
+            ],
+          ),
+        ),
+      );
+
+  void _showMoreSheet() => showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (sheetCtx) => SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40, height: 4,
+                  margin: const EdgeInsets.only(top: 10, bottom: 14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFCBD5E1),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 0, 20, 6),
+                child: Text('More',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold,
+                        color: Color(0xFF1E293B))),
+              ),
+              ..._moreActions.map((a) => ListTile(
+                    leading: Container(
+                      width: 40, height: 40,
+                      decoration: BoxDecoration(
+                        color: a.color.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(a.icon, color: a.color, size: 21),
+                    ),
+                    title: Text(a.label,
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600,
+                            color: Color(0xFF334155))),
+                    trailing: const Icon(Icons.chevron_right_rounded,
+                        color: Color(0xFF94A3B8)),
+                    onTap: () {
+                      Navigator.pop(sheetCtx);
+                      _open(a);
+                    },
+                  )),
+              const SizedBox(height: 8),
+            ],
           ),
         ),
       );
