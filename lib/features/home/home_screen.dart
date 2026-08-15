@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:odon_booking/core/api/api_service.dart';
 import 'package:odon_booking/features/bookings/room_selection_screen.dart';
@@ -35,8 +37,13 @@ class HomeScreen extends StatefulWidget {
   _HomeScreenState createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   final ApiService _apiService = ApiService();
+
+  // The room overview goes stale while the screen sits open (e.g. the manager
+  // adds bookings from another device), so re-pull quietly on this interval.
+  static const _autoRefreshInterval = Duration(seconds: 30);
 
   late TabController _tabController;
   int _dayOffset = 0; // 0 = today, 1 = tomorrow
@@ -46,9 +53,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   bool _loading = true;
   String? _error;
 
+  Timer? _autoRefreshTimer;
+  bool _refreshing = false;
+  DateTime? _lastUpdated;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _tabController = TabController(length: 2, vsync: this)
       ..addListener(() {
         if (!_tabController.indexIsChanging) {
@@ -56,12 +68,35 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         }
       });
     _fetchData();
+    _startAutoRefresh();
   }
 
   @override
   void dispose() {
+    _autoRefreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _tabController.dispose();
     super.dispose();
+  }
+
+  // ── Auto refresh ────────────────────────────────────────────────────────────
+
+  void _startAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer =
+        Timer.periodic(_autoRefreshInterval, (_) => _fetchData(silent: true));
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Coming back from the background: refresh now, then resume the ticker.
+      _fetchData(silent: true);
+      _startAutoRefresh();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      _autoRefreshTimer?.cancel();
+    }
   }
 
   // ── Data ────────────────────────────────────────────────────────────────────
@@ -71,20 +106,36 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     return DateTime(n.year, n.month, n.day + _dayOffset);
   }
 
-  Future<void> _fetchData() async {
-    setState(() { _loading = true; _error = null; });
+  // [silent] keeps the current data on screen while refetching — used by the
+  // auto refresh so the overview updates without a spinner or scroll jump.
+  Future<void> _fetchData({bool silent = false}) async {
+    if (_refreshing) return;
+    _refreshing = true;
+    if (!silent) {
+      setState(() { _loading = true; _error = null; });
+    } else {
+      setState(() {});
+    }
     try {
       final bookings = await _apiService.fetchBookings(DateTime.now());
       final config   = await _apiService.fetchRoomConfig();
+      if (!mounted) return;
       setState(() {
         _allBookings = bookings;
         _roomConfig  = List<Map<String, dynamic>>.from(
           (config['rooms'] as List).map((r) => Map<String, dynamic>.from(r)),
         );
         _loading = false;
+        _error = null;
+        _lastUpdated = DateTime.now();
       });
     } catch (e) {
+      if (!mounted) return;
+      // On a silent refresh keep whatever is already on screen; only flag it.
       setState(() { _loading = false; _error = e.toString(); });
+    } finally {
+      _refreshing = false;
+      if (mounted) setState(() {});
     }
   }
 
@@ -350,12 +401,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       const Text('ODON Hotel',
                           style: TextStyle(color: Colors.white, fontSize: 20,
                               fontWeight: FontWeight.bold, letterSpacing: 0.4)),
-                      Text(dateStr,
+                      Text('$dateStr  •  ${_freshnessLabel()}',
                           style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 12)),
                     ],
                   ),
                   const Spacer(),
-                  _iconBtn(Icons.refresh, _fetchData),
+                  _refreshBtn(),
                   const SizedBox(width: 8),
                   _iconBtn(Icons.logout, () => Navigator.pushAndRemoveUntil(
                     context, MaterialPageRoute(builder: (_) => LoginScreen()), (_) => false)),
@@ -366,6 +417,33 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         ),
       ),
     );
+  }
+
+  // Tells the user how stale the numbers are, so a quiet refresh is visible.
+  String _freshnessLabel() {
+    if (_refreshing) return 'Updating…';
+    if (_lastUpdated == null) return 'Not updated yet';
+    final mins = DateTime.now().difference(_lastUpdated!).inMinutes;
+    if (mins < 1) return 'Updated just now';
+    if (mins == 1) return 'Updated 1 min ago';
+    return 'Updated $mins mins ago';
+  }
+
+  Widget _refreshBtn() {
+    if (_refreshing) {
+      return Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.18),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: const SizedBox(
+          width: 19, height: 19,
+          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+        ),
+      );
+    }
+    return _iconBtn(Icons.refresh, _fetchData);
   }
 
   Widget _iconBtn(IconData icon, VoidCallback onTap) => GestureDetector(
@@ -792,8 +870,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         () => RoomConfigScreen()),
   ];
 
-  void _open(_QuickAction a) => Navigator.push(
-      context, MaterialPageRoute(builder: (_) => a.builder()));
+  // Refreshes on return, so anything booked/edited there shows up right away
+  // instead of waiting for the next auto-refresh tick.
+  Future<void> _open(_QuickAction a) async {
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => a.builder()));
+    if (mounted) await _fetchData(silent: true);
+  }
 
   Widget _quickActions() {
     final actions = [..._primaryActions, ..._moreActions];
