@@ -33,11 +33,17 @@ class _SelectedDayBookingsScreenState
     try {
       final fetched = await _apiService.fetchBookings(widget.selectedDay);
       setState(() {
+        // Match the calendar screen: a booking counts for every night it
+        // occupies, not only its check-in day.
+        final day = DateTime(widget.selectedDay.year, widget.selectedDay.month,
+            widget.selectedDay.day);
         _bookings = fetched.where((b) {
           final ci = DateTime.parse(b['checkIn']);
-          return ci.year == widget.selectedDay.year &&
-              ci.month == widget.selectedDay.month &&
-              ci.day == widget.selectedDay.day;
+          final co = DateTime.parse(b['checkOut']);
+          final start = DateTime(ci.year, ci.month, ci.day);
+          final end = DateTime(co.year, co.month, co.day);
+          if (!end.isAfter(start)) return day == start;
+          return !day.isBefore(start) && day.isBefore(end);
         }).toList();
       });
     } catch (_) {}
