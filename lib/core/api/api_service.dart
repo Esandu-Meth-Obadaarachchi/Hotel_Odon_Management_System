@@ -1,5 +1,20 @@
 import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
+
+/// Thrown when the backend rejects the caller's sign-in — either no/expired
+/// token, or an account that is not on the allow-list.
+class ApiAuthException implements Exception {
+  ApiAuthException(this.statusCode, this.message);
+
+  final int statusCode;
+  final String message;
+
+  bool get isNotAllowed => statusCode == 403;
+
+  @override
+  String toString() => message;
+}
 
 class ApiService {
   // Switch back to Railway URL after rehosting the backend
@@ -9,9 +24,70 @@ class ApiService {
   // Physical device: use your machine's local IP, e.g. http://192.168.1.26:3000
   //http://localhost:3000
 
+  // ── Auth ───────────────────────────────────────────────────────────────────
+  //
+  // Every request carries the signed-in user's Firebase ID token. The backend
+  // verifies it against Google's public keys and stamps createdBy/updatedBy
+  // from the verified claims, so "who made this booking" cannot be spoofed by
+  // a client.
+  //
+  // Firebase is currently only initialised on web ([main.dart]), so on mobile
+  // there is no token yet and requests go out unauthenticated — the backend
+  // accepts those while AUTH_ENFORCE is off. Once mobile sign-in is added this
+  // starts returning tokens with no change needed here.
+
+  Future<String?> _idToken() async {
+    try {
+      return await FirebaseAuth.instance.currentUser?.getIdToken();
+    } catch (_) {
+      // Firebase not initialised on this platform (mobile, for now).
+      return null;
+    }
+  }
+
+  Future<Map<String, String>> _headers([Map<String, String>? extra]) async {
+    final headers = <String, String>{...?extra};
+    final token = await _idToken();
+    if (token != null) headers['Authorization'] = 'Bearer $token';
+    return headers;
+  }
+
+  /// Surfaces auth failures as [ApiAuthException] so screens can show
+  /// "please sign in again" instead of a generic failure message.
+  http.Response _check(http.Response res) {
+    if (res.statusCode == 401 || res.statusCode == 403) {
+      String message;
+      try {
+        message = (jsonDecode(res.body) as Map)['message']?.toString() ??
+            'Not authorised';
+      } catch (_) {
+        message = res.statusCode == 403
+            ? 'This account is not allowed to use the app'
+            : 'Please sign in again';
+      }
+      throw ApiAuthException(res.statusCode, message);
+    }
+    return res;
+  }
+
+  Future<http.Response> _get(Uri url, {Map<String, String>? headers}) async =>
+      _check(await http.get(url, headers: await _headers(headers)));
+
+  Future<http.Response> _post(Uri url,
+          {Map<String, String>? headers, Object? body}) async =>
+      _check(await http.post(url, headers: await _headers(headers), body: body));
+
+  Future<http.Response> _put(Uri url,
+          {Map<String, String>? headers, Object? body}) async =>
+      _check(await http.put(url, headers: await _headers(headers), body: body));
+
+  Future<http.Response> _delete(Uri url,
+          {Map<String, String>? headers, Object? body}) async =>
+      _check(await http.delete(url, headers: await _headers(headers), body: body));
+
   Future<List<Map<String, dynamic>>> fetchFutureBookings(DateTime fromDate) async {
     //final String baseUrl = await _getBaseUrl();
-    final response = await http.get(Uri.parse('$baseUrl/bookings?fromCheckIn=${fromDate.toIso8601String()}'));
+    final response = await _get(Uri.parse('$baseUrl/bookings?fromCheckIn=${fromDate.toIso8601String()}'));
     if (response.statusCode == 200) {
       List<dynamic> data = jsonDecode(response.body);
       return data.cast<Map<String, dynamic>>();
@@ -29,7 +105,7 @@ class ApiService {
     final url = Uri.parse('$baseUrl/bookings?checkIn=$checkIn&checkOut=$checkOut');
 
     try {
-      final response = await http.get(url);
+      final response = await _get(url);
 
       if (response.statusCode == 200) {
         // Parse the response and convert it into a List of Maps
@@ -51,7 +127,7 @@ class ApiService {
     final String endOfMonth = DateTime(month.year, month.month + 1, 0).toIso8601String();
 
     // API call to fetch bookings where checkIn and checkOut fall within the selected month
-    final response = await http.get(Uri.parse('$baseUrl/bookings?checkInStart=$startOfMonth&checkOutEnd=$endOfMonth'));
+    final response = await _get(Uri.parse('$baseUrl/bookings?checkInStart=$startOfMonth&checkOutEnd=$endOfMonth'));
 
     if (response.statusCode == 200) {
       List<dynamic> data = jsonDecode(response.body);
@@ -64,7 +140,7 @@ class ApiService {
 
   Future<List<Map<String, dynamic>>> fetchBookings(DateTime date) async {
     //final String baseUrl = await _getBaseUrl();
-    final response = await http.get(Uri.parse('$baseUrl/bookings?checkIn=${date.toIso8601String()}'));
+    final response = await _get(Uri.parse('$baseUrl/bookings?checkIn=${date.toIso8601String()}'));
 
     if (response.statusCode == 200) {
       List<dynamic> bookings = json.decode(response.body);
@@ -75,7 +151,7 @@ class ApiService {
   }
 
   Future<void> updateBooking(String id, Map<String, dynamic> updatedBooking) async {
-    final response = await http.put(
+    final response = await _put(
       Uri.parse('$baseUrl/bookings/$id'),
       headers: <String, String>{
         'Content-Type': 'application/json; charset=UTF-8',
@@ -90,7 +166,7 @@ class ApiService {
 
   Future<void> deleteBooking(String id) async {
     //final String baseUrl = await _getBaseUrl();
-    final response = await http.delete(Uri.parse('$baseUrl/bookings/$id'));
+    final response = await _delete(Uri.parse('$baseUrl/bookings/$id'));
 
     if (response.statusCode != 200) {
       throw Exception('Failed to delete booking: ${response.body}');
@@ -99,7 +175,7 @@ class ApiService {
 
   Future<void> addBooking(Map<String, dynamic> newBooking) async {
     //final String baseUrl = await _getBaseUrl();
-    final response = await http.post(
+    final response = await _post(
       Uri.parse('$baseUrl/bookings'),
       headers: <String, String>{
         'Content-Type': 'application/json; charset=UTF-8',
@@ -114,7 +190,7 @@ class ApiService {
 
   Future<void> addInventory(Map<String, dynamic> newBooking) async {
     //final String baseUrl = await _getBaseUrl();
-    final response = await http.post(
+    final response = await _post(
       Uri.parse('$baseUrl/inventory'),
       headers: <String, String>{
         'Content-Type': 'application/json; charset=UTF-8',
@@ -128,7 +204,7 @@ class ApiService {
   }
 
   Future<List<dynamic>> fetchInventoryItems() async {
-    final response = await http.get(
+    final response = await _get(
       Uri.parse('$baseUrl/inventory'),
       headers: <String, String>{
         'Content-Type': 'application/json; charset=UTF-8',
@@ -143,7 +219,7 @@ class ApiService {
   }
 
   Future<void> updateInventoryItem(String id, Map<String, dynamic> updatedItem) async {
-    final response = await http.put(
+    final response = await _put(
       Uri.parse('$baseUrl/inventory/$id'),
       headers: <String, String>{
         'Content-Type': 'application/json; charset=UTF-8',
@@ -158,7 +234,7 @@ class ApiService {
 
   // SALARY METHODS
   Future<List<Map<String, dynamic>>> fetchSalaries() async {
-    final response = await http.get(Uri.parse('$baseUrl/salaries'));
+    final response = await _get(Uri.parse('$baseUrl/salaries'));
     if (response.statusCode == 200) {
       List<dynamic> data = jsonDecode(response.body);
       return data.cast<Map<String, dynamic>>();
@@ -168,7 +244,7 @@ class ApiService {
   }
 
   Future<void> addSalary(Map<String, dynamic> salaryData) async {
-    final response = await http.post(
+    final response = await _post(
       Uri.parse('$baseUrl/salaries'),
       headers: <String, String>{
         'Content-Type': 'application/json; charset=UTF-8',
@@ -182,7 +258,7 @@ class ApiService {
   }
 
   Future<void> updateSalary(String id, Map<String, dynamic> salaryData) async {
-    final response = await http.put(
+    final response = await _put(
       Uri.parse('$baseUrl/salaries/$id'),
       headers: <String, String>{
         'Content-Type': 'application/json; charset=UTF-8',
@@ -196,7 +272,7 @@ class ApiService {
   }
 
   Future<void> deleteSalary(String id) async {
-    final response = await http.delete(Uri.parse('$baseUrl/salaries/$id'));
+    final response = await _delete(Uri.parse('$baseUrl/salaries/$id'));
     if (response.statusCode != 200) {
       throw Exception('Failed to delete salary: ${response.reasonPhrase}');
     }
@@ -204,7 +280,7 @@ class ApiService {
 
   // EXPENSE METHODS
   Future<List<Map<String, dynamic>>> fetchExpenses() async {
-    final response = await http.get(Uri.parse('$baseUrl/expenses'));
+    final response = await _get(Uri.parse('$baseUrl/expenses'));
     if (response.statusCode == 200) {
       List<dynamic> data = jsonDecode(response.body);
       return data.cast<Map<String, dynamic>>();
@@ -214,7 +290,7 @@ class ApiService {
   }
 
   Future<void> addExpense(Map<String, dynamic> expenseData) async {
-    final response = await http.post(
+    final response = await _post(
       Uri.parse('$baseUrl/expenses'),
       headers: <String, String>{
         'Content-Type': 'application/json; charset=UTF-8',
@@ -228,7 +304,7 @@ class ApiService {
   }
 
   Future<void> updateExpense(String id, Map<String, dynamic> expenseData) async {
-    final response = await http.put(
+    final response = await _put(
       Uri.parse('$baseUrl/expenses/$id'),
       headers: <String, String>{
         'Content-Type': 'application/json; charset=UTF-8',
@@ -242,7 +318,7 @@ class ApiService {
   }
 
   Future<void> deleteExpense(String id) async {
-    final response = await http.delete(Uri.parse('$baseUrl/expenses/$id'));
+    final response = await _delete(Uri.parse('$baseUrl/expenses/$id'));
     if (response.statusCode != 200) {
       throw Exception('Failed to delete expense: ${response.reasonPhrase}');
     }
@@ -251,7 +327,7 @@ class ApiService {
 
   // Fetch expenses for a specific month
   Future<List<Map<String, dynamic>>> fetchExpensesForMonth(DateTime month) async {
-    final response = await http.get(
+    final response = await _get(
         Uri.parse('$baseUrl/expenses/month/${month.year}/${month.month}')
     );
     if (response.statusCode == 200) {
@@ -264,7 +340,7 @@ class ApiService {
 
 // Fetch salaries for a specific month
   Future<List<Map<String, dynamic>>> fetchSalariesForMonth(DateTime month) async {
-    final response = await http.get(
+    final response = await _get(
         Uri.parse('$baseUrl/salaries/month/${month.year}/${month.month}')
     );
     if (response.statusCode == 200) {
@@ -276,7 +352,7 @@ class ApiService {
   }
 
   Future<void> deleteInventoryItem(String id) async {
-    final response = await http.delete(
+    final response = await _delete(
       Uri.parse('$baseUrl/inventory/$id'),
       headers: {
         'Content-Type': 'application/json; charset=UTF-8',
@@ -292,7 +368,7 @@ class ApiService {
   // ROOM CONFIG METHODS
 
   Future<Map<String, dynamic>> fetchRoomConfig() async {
-    final response = await http.get(Uri.parse('$baseUrl/room-config'));
+    final response = await _get(Uri.parse('$baseUrl/room-config'));
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
     } else {
@@ -301,7 +377,7 @@ class ApiService {
   }
 
   Future<void> updateRoomConfig(List<Map<String, dynamic>> rooms) async {
-    final response = await http.put(
+    final response = await _put(
       Uri.parse('$baseUrl/room-config'),
       headers: {'Content-Type': 'application/json; charset=UTF-8'},
       body: jsonEncode({'rooms': rooms}),
@@ -314,7 +390,7 @@ class ApiService {
   // GUEST METHODS
 
   Future<List<Map<String, dynamic>>> fetchGuests() async {
-    final response = await http.get(Uri.parse('$baseUrl/guests'));
+    final response = await _get(Uri.parse('$baseUrl/guests'));
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
       return data.cast<Map<String, dynamic>>();
@@ -325,7 +401,7 @@ class ApiService {
 
   Future<List<Map<String, dynamic>>> searchGuests(String query) async {
     final url = Uri.parse('$baseUrl/guests/search?q=${Uri.encodeQueryComponent(query)}');
-    final response = await http.get(url);
+    final response = await _get(url);
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
       return data.cast<Map<String, dynamic>>();
@@ -335,7 +411,7 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> fetchGuest(String phone) async {
-    final response = await http.get(Uri.parse('$baseUrl/guests/${Uri.encodeComponent(phone)}'));
+    final response = await _get(Uri.parse('$baseUrl/guests/${Uri.encodeComponent(phone)}'));
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
     } else {
@@ -344,7 +420,7 @@ class ApiService {
   }
 
   Future<List<Map<String, dynamic>>> fetchGuestBookings(String phone) async {
-    final response = await http.get(Uri.parse('$baseUrl/guests/${Uri.encodeComponent(phone)}/bookings'));
+    final response = await _get(Uri.parse('$baseUrl/guests/${Uri.encodeComponent(phone)}/bookings'));
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
       return data.cast<Map<String, dynamic>>();
@@ -356,7 +432,7 @@ class ApiService {
   // PRICE CONFIG METHODS
 
   Future<Map<String, dynamic>> fetchPrices() async {
-    final response = await http.get(Uri.parse('$baseUrl/prices'));
+    final response = await _get(Uri.parse('$baseUrl/prices'));
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
     } else {
@@ -366,7 +442,7 @@ class ApiService {
 
   Future<void> updatePrices(
       Map<String, Map<String, double>> packages, double driverRoomPrice) async {
-    final response = await http.put(
+    final response = await _put(
       Uri.parse('$baseUrl/prices'),
       headers: {'Content-Type': 'application/json; charset=UTF-8'},
       body: jsonEncode({

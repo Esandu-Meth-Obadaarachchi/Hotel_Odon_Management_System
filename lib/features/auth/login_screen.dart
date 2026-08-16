@@ -30,6 +30,10 @@ class _LoginScreenState extends State<LoginScreen> {
       final cred = await FirebaseAuth.instance.signInWithPopup(provider);
       final email = cred.user?.email;
 
+      // TEMP DIAGNOSTIC — remove once the sign-in problem is settled.
+      debugPrint('[auth] firebase returned email=${email == null ? 'NULL' : '"$email"'} '
+          'allowed=${isAllowedEmail(email)} allowlist=$kAllowedEmails');
+
       if (!isAllowedEmail(email)) {
         // Wrong account — kick them straight back out so no session lingers.
         await FirebaseAuth.instance.signOut();
