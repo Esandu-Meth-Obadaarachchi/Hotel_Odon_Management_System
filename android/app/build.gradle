@@ -5,7 +5,8 @@ plugins {
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id "dev.flutter.flutter-gradle-plugin"
 
-
+    // Firebase config for Android, read from google-services.json.
+    id "com.google.gms.google-services"
 }
 
 def localProperties = new Properties()
@@ -43,7 +44,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.odon_booking"
-        minSdk = 23 // firebase_auth requires minSdk 23 (raised from flutter.minSdkVersion)
+        minSdkVersion = flutter.minSdkVersion // firebase_auth requires minSdk 23 (raised from flutter.minSdkVersion)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutterVersionCode.toInteger()
         versionName = flutterVersionName

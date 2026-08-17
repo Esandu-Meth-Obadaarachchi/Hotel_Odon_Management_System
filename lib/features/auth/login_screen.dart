@@ -1,11 +1,11 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
-import 'auth_gate.dart';
-
-/// Google sign-in page for the web dashboard. Only the accounts listed in
-/// [kAllowedEmails] are allowed through; any other account is signed back out
-/// immediately and shown an error.
+/// Google sign-in page, used on web and mobile alike.
+///
+/// Who is actually allowed in is decided by the server after sign-in (see
+/// AuthGate) — this screen only proves identity.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -27,7 +27,13 @@ class _LoginScreenState extends State<LoginScreen> {
       final provider = GoogleAuthProvider()
         ..setCustomParameters({'prompt': 'select_account'});
 
-      final cred = await FirebaseAuth.instance.signInWithPopup(provider);
+      // Web opens a popup. Mobile uses the provider flow, which hands off to a
+      // browser tab and comes back — it needs no SHA-1 registration and no
+      // extra plugin, so it keeps working even though the release APK is
+      // currently signed with the debug key.
+      final cred = kIsWeb
+          ? await FirebaseAuth.instance.signInWithPopup(provider)
+          : await FirebaseAuth.instance.signInWithProvider(provider);
       final email = cred.user?.email;
 
       // Logged so a near-miss (extra dot, googlemail.com, wrong account picked)
