@@ -1,26 +1,44 @@
 {
   "project_info": {
-    "project_number": "1001941852421",
-    "project_id": "hotelbooking-507e1",
-    "storage_bucket": "hotelbooking-507e1.appspot.com"
+    "project_number": "54906570613",
+    "project_id": "odon-dashboard-fin",
+    "storage_bucket": "odon-dashboard-fin.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1001941852421:android:6ec96cee92f7a83134d76c",
+        "mobilesdk_app_id": "1:54906570613:android:931e7ed941c279a8d6b53c",
         "android_client_info": {
           "package_name": "com.example.odon_booking"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "54906570613-7o321i9gvlbn1onhie7p7vje2rtcjmjj.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.odon_booking",
+            "certificate_hash": "99d467b9aba3142931e56ca611d757b38dbf4e81"
+          }
+        },
+        {
+          "client_id": "54906570613-q9h9hb0l2o4e9agl78buc3uov1ugcr0v.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyBJnttdpGxiHR-VhigwifR53hkiwzThJ0o"
+          "current_key": "AIzaSyAAVF6lTXH_uZnIYpjqkFDBpdoulmge34Y"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "54906570613-q9h9hb0l2o4e9agl78buc3uov1ugcr0v.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
