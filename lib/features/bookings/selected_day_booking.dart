@@ -38,8 +38,9 @@ class _SelectedDayBookingsScreenState
         final day = DateTime(widget.selectedDay.year, widget.selectedDay.month,
             widget.selectedDay.day);
         _bookings = fetched.where((b) {
-          final ci = DateTime.parse(b['checkIn']);
-          final co = DateTime.parse(b['checkOut']);
+          final ci = DateTime.tryParse(b['checkIn']?.toString() ?? '');
+          final co = DateTime.tryParse(b['checkOut']?.toString() ?? '');
+          if (ci == null || co == null) return false; // unreadable dates
           final start = DateTime(ci.year, ci.month, ci.day);
           final end = DateTime(co.year, co.month, co.day);
           if (!end.isAfter(start)) return day == start;

@@ -76,9 +76,18 @@ class _ViewBookingsScreenState extends State<ViewBookingsScreen> {
       final Map<DateTime, List> events = {};
       int totalRoomNights = 0;
 
+      int skipped = 0;
+
       for (final booking in bookings) {
-        final checkInDate = DateTime.parse(booking['checkIn']);
-        final checkOutDate = DateTime.parse(booking['checkOut']);
+        // A record with a missing or malformed date must not take the whole
+        // calendar down with it — skip it and carry on.
+        final checkInDate = DateTime.tryParse(booking['checkIn']?.toString() ?? '');
+        final checkOutDate = DateTime.tryParse(booking['checkOut']?.toString() ?? '');
+        if (checkInDate == null || checkOutDate == null) {
+          skipped++;
+          continue;
+        }
+
         final rooms = _roomCount(booking);
         final nights = _nightsOf(checkInDate, checkOutDate);
 
@@ -92,6 +101,10 @@ class _ViewBookingsScreenState extends State<ViewBookingsScreen> {
           if (night.month != _focusedDay.month || night.year != _focusedDay.year) continue;
           events[night] = [...(events[night] ?? []), booking];
         }
+      }
+
+      if (skipped > 0) {
+        print('Skipped $skipped booking(s) with an unreadable check-in/out date');
       }
 
       setState(() {
@@ -409,6 +422,7 @@ class _ViewBookingsScreenState extends State<ViewBookingsScreen> {
     final checkOut = booking['checkOut'] != null ? DateTime.parse(booking['checkOut']) : null;
 
     final stayStatus = _stayStatus(checkIn, checkOut);
+    final auditLine = _auditLine(booking);
 
     final needDriver = booking['needDriver'] == true;
     final isNewFormat = booking['rooms'] != null && (booking['rooms'] as List).isNotEmpty;
@@ -611,7 +625,56 @@ class _ViewBookingsScreenState extends State<ViewBookingsScreen> {
                     ),
                   ),
                 ],
+
+                // ── Who entered / last edited this ────────────────────────────
+                if (auditLine != null) auditLine,
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// "Added by dad · Edited by esandu, 14 Aug" — from the server-stamped
+  /// fields. Returns null for records created before the audit trail existed.
+  Widget? _auditLine(Map<String, dynamic> booking) {
+    final createdBy = (booking['createdBy'] as String?)?.trim() ?? '';
+    final updatedBy = (booking['updatedBy'] as String?)?.trim() ?? '';
+    if (createdBy.isEmpty && updatedBy.isEmpty) return null;
+
+    String who(String email, String name) {
+      final n = name.trim();
+      if (n.isNotEmpty) return n.split(' ').first;
+      return email.split('@').first;
+    }
+
+    final parts = <String>[];
+    if (createdBy.isNotEmpty) {
+      parts.add('Added by ${who(createdBy, booking['createdByName'] as String? ?? '')}');
+    }
+    // Only worth showing the editor when it is a genuine later edit.
+    final updatedAt = DateTime.tryParse(booking['updatedAt'] as String? ?? '');
+    final createdAt = DateTime.tryParse(booking['createdAt'] as String? ?? '');
+    final wasEdited = updatedAt != null &&
+        (createdAt == null || updatedAt.difference(createdAt).inSeconds > 5);
+    if (updatedBy.isNotEmpty && wasEdited) {
+      final label = who(updatedBy, booking['updatedByName'] as String? ?? '');
+      parts.add('edited by $label ${_fmtDate(updatedAt)}');
+    }
+    if (parts.isEmpty) return null;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Row(
+        children: [
+          Icon(Icons.history, size: 12, color: Colors.grey.shade400),
+          const SizedBox(width: 5),
+          Expanded(
+            child: Text(
+              parts.join(' · '),
+              style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],

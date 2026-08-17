@@ -24,11 +24,15 @@ class _FutureBookingsScreenState extends State<FutureBookingsScreen> {
     try {
       final currentDate = DateTime.now();
       final bookings = await _apiService.fetchFutureBookings(currentDate);
+      // Records with an unreadable check-in are dropped rather than allowed to
+      // throw and blank the whole list.
+      DateTime? ci(Map<String, dynamic> b) =>
+          DateTime.tryParse(b['checkIn']?.toString() ?? '');
       final filtered = bookings.where((b) {
-        return DateTime.parse(b['checkIn']).isAfter(currentDate);
+        final d = ci(b);
+        return d != null && d.isAfter(currentDate);
       }).toList()
-        ..sort((a, b) =>
-            DateTime.parse(a['checkIn']).compareTo(DateTime.parse(b['checkIn'])));
+        ..sort((a, b) => ci(a)!.compareTo(ci(b)!));
       setState(() {
         _futureBookings = filtered;
         _loading = false;
