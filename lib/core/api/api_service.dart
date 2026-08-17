@@ -17,12 +17,20 @@ class ApiAuthException implements Exception {
 }
 
 class ApiService {
-  // Switch back to Railway URL after rehosting the backend
-  //final String baseUrl = 'http://192.168.1.26:3000';
-  final String baseUrl = 'https://odonbookingflutterapp-production.up.railway.app';
-  // Android emulator: use http://10.0.2.2:3000
-  // Physical device: use your machine's local IP, e.g. http://192.168.1.26:3000
-  //http://localhost:3000
+  /// Defaults to the hosted backend. Point it somewhere else without touching
+  /// this file:
+  ///
+  ///   flutter run -d chrome --dart-define=API_BASE_URL=http://localhost:3000
+  ///
+  /// Android emulator: use http://10.0.2.2:3000
+  /// Physical device: your machine's LAN IP, e.g. http://192.168.1.26:3000
+  static const String _defaultBaseUrl =
+      'https://odonbookingflutterapp-production.up.railway.app';
+
+  final String baseUrl = const String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: _defaultBaseUrl,
+  );
 
   // ── Auth ───────────────────────────────────────────────────────────────────
   //
