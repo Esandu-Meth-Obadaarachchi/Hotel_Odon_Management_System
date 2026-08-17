@@ -76,9 +76,18 @@ class _ViewBookingsScreenState extends State<ViewBookingsScreen> {
       final Map<DateTime, List> events = {};
       int totalRoomNights = 0;
 
+      int skipped = 0;
+
       for (final booking in bookings) {
-        final checkInDate = DateTime.parse(booking['checkIn']);
-        final checkOutDate = DateTime.parse(booking['checkOut']);
+        // A record with a missing or malformed date must not take the whole
+        // calendar down with it — skip it and carry on.
+        final checkInDate = DateTime.tryParse(booking['checkIn']?.toString() ?? '');
+        final checkOutDate = DateTime.tryParse(booking['checkOut']?.toString() ?? '');
+        if (checkInDate == null || checkOutDate == null) {
+          skipped++;
+          continue;
+        }
+
         final rooms = _roomCount(booking);
         final nights = _nightsOf(checkInDate, checkOutDate);
 
@@ -92,6 +101,10 @@ class _ViewBookingsScreenState extends State<ViewBookingsScreen> {
           if (night.month != _focusedDay.month || night.year != _focusedDay.year) continue;
           events[night] = [...(events[night] ?? []), booking];
         }
+      }
+
+      if (skipped > 0) {
+        print('Skipped $skipped booking(s) with an unreadable check-in/out date');
       }
 
       setState(() {

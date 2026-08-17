@@ -25,12 +25,14 @@ class _PastBookingsScreenState extends State<PastBookingsScreen> {
     try {
       final all = await _apiService.fetchBookingsForMonth(month);
       setState(() {
+        // Unreadable dates are dropped rather than allowed to throw.
+        DateTime? ci(Map<String, dynamic> b) =>
+            DateTime.tryParse(b['checkIn']?.toString() ?? '');
         _bookings = all.where((b) {
-          final ci = DateTime.parse(b['checkIn']);
-          return ci.year == month.year && ci.month == month.month;
+          final d = ci(b);
+          return d != null && d.year == month.year && d.month == month.month;
         }).toList()
-          ..sort((a, b) =>
-              DateTime.parse(a['checkIn']).compareTo(DateTime.parse(b['checkIn'])));
+          ..sort((a, b) => ci(a)!.compareTo(ci(b)!));
         _loading = false;
       });
     } catch (e) {

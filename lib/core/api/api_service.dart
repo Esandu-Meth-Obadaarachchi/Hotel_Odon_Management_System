@@ -85,6 +85,63 @@ class ApiService {
           {Map<String, String>? headers, Object? body}) async =>
       _check(await http.delete(url, headers: await _headers(headers), body: body));
 
+  // ── Identity & access management ───────────────────────────────────────────
+
+  /// Asks the server who the signed-in user is and whether they may use the
+  /// dashboard. Returns null when the server cannot answer — an old backend
+  /// without this route, or no network — so the caller can fall back rather
+  /// than lock the owner out. Throws [ApiAuthException] on a real refusal.
+  Future<Map<String, dynamic>?> fetchMe() async {
+    try {
+      final res = await _get(Uri.parse('$baseUrl/me'));
+      if (res.statusCode != 200) return null; // e.g. 404 on the old backend
+      return Map<String, dynamic>.from(jsonDecode(res.body) as Map);
+    } on ApiAuthException {
+      rethrow; // 403 = genuinely not allowed; the caller must honour it
+    } catch (_) {
+      return null; // network/parse trouble — caller decides
+    }
+  }
+
+  /// {emails: [...], owners: [...]} — owners are protected and cannot be removed.
+  Future<Map<String, dynamic>> fetchAccessList() async {
+    final res = await _get(Uri.parse('$baseUrl/admin/allowed-emails'));
+    if (res.statusCode != 200) {
+      throw Exception('Could not load the access list (${res.statusCode})');
+    }
+    return Map<String, dynamic>.from(jsonDecode(res.body) as Map);
+  }
+
+  Future<Map<String, dynamic>> addAllowedEmail(String email) async {
+    final res = await _post(
+      Uri.parse('$baseUrl/admin/allowed-emails'),
+      headers: {'Content-Type': 'application/json; charset=UTF-8'},
+      body: jsonEncode({'email': email}),
+    );
+    if (res.statusCode != 201) {
+      throw Exception(_messageOf(res, 'Could not add that address'));
+    }
+    return Map<String, dynamic>.from(jsonDecode(res.body) as Map);
+  }
+
+  Future<Map<String, dynamic>> removeAllowedEmail(String email) async {
+    final res = await _delete(
+      Uri.parse('$baseUrl/admin/allowed-emails/${Uri.encodeComponent(email)}'),
+    );
+    if (res.statusCode != 200) {
+      throw Exception(_messageOf(res, 'Could not remove that address'));
+    }
+    return Map<String, dynamic>.from(jsonDecode(res.body) as Map);
+  }
+
+  String _messageOf(http.Response res, String fallback) {
+    try {
+      return (jsonDecode(res.body) as Map)['message']?.toString() ?? fallback;
+    } catch (_) {
+      return fallback;
+    }
+  }
+
   Future<List<Map<String, dynamic>>> fetchFutureBookings(DateTime fromDate) async {
     //final String baseUrl = await _getBaseUrl();
     final response = await _get(Uri.parse('$baseUrl/bookings?fromCheckIn=${fromDate.toIso8601String()}'));

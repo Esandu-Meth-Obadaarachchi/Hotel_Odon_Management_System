@@ -41,21 +41,29 @@ email and have it recorded.
 ## The allow-list
 
 Stored in Mongo as a `settings` document with `key: 'allowedEmails'`, seeded on
-first boot from `ALLOWED_EMAILS` (or the two owner accounts). It is read through
-a 60-second cache.
+first boot from `ALLOWED_EMAILS`. Read through a 60-second cache, so changes
+take effect within a minute.
 
-It lives in the database rather than in code so an admin settings screen can
-edit it later without a redeploy. Until that screen exists, add a user by
-editing the document directly:
+**Manage it from the app**: the *User Access* tile on the home screen (owner
+accounts only) adds and removes people. No redeploy, no new app version.
 
-```js
-db.settings.updateOne(
-  { key: 'allowedEmails' },
-  { $addToSet: { value: 'newperson@gmail.com' } }
-)
-```
+Endpoints behind it:
 
-Changes take effect within a minute.
+| Route | Who | Purpose |
+|---|---|---|
+| `GET /me` | any signed-in, allow-listed account | who am I, am I an owner |
+| `GET /admin/allowed-emails` | owners only | current list + protected owners |
+| `POST /admin/allowed-emails` | owners only | grant access |
+| `DELETE /admin/allowed-emails/:email` | owners only | revoke access |
+
+**Owners** are the addresses in `ALLOWED_EMAILS`. They are always allowed,
+always admin, and cannot be removed — otherwise someone added later could lock
+the owners out of their own system. Change who counts as an owner by editing
+that variable and restarting.
+
+The app asks `/me` after sign-in rather than carrying its own copy of the list.
+If the server cannot answer (old backend, no network) it falls back to the
+built-in owner addresses in `auth_gate.dart`, so an outage can't lock you out.
 
 ## Audit fields
 

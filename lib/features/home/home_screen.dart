@@ -11,6 +11,8 @@ import 'package:odon_booking/features/financials/calculate_profit_page.dart';
 import 'package:odon_booking/features/invoices/generate_invoice_screen.dart';
 import 'package:odon_booking/features/financials/expenses_screen.dart';
 import 'package:odon_booking/features/guests/guests_list_screen.dart';
+import 'package:odon_booking/features/settings/user_access_screen.dart';
+import 'package:odon_booking/features/auth/auth_gate.dart';
 
 // ── Package meta ──────────────────────────────────────────────────────────────
 
@@ -870,6 +872,18 @@ class _HomeScreenState extends State<HomeScreen>
         () => RoomConfigScreen()),
   ];
 
+  /// Managing who can sign in is owner-only, so this tile is added at build
+  /// time rather than living in the static list. The backend enforces the same
+  /// rule — hiding it here is convenience, not the control.
+  static final _userAccessAction = _QuickAction(
+      'User Access', Icons.admin_panel_settings_rounded, const Color(0xFF0F766E),
+      () => const UserAccessScreen());
+
+  List<_QuickAction> get _visibleMoreActions => [
+        ..._moreActions,
+        if (CurrentUser.current?.isAdmin == true) _userAccessAction,
+      ];
+
   // Refreshes on return, so anything booked/edited there shows up right away
   // instead of waiting for the next auto-refresh tick.
   Future<void> _open(_QuickAction a) async {
@@ -878,7 +892,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _quickActions() {
-    final actions = [..._primaryActions, ..._moreActions];
+    final actions = [..._primaryActions, ..._visibleMoreActions];
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -1008,7 +1022,7 @@ class _HomeScreenState extends State<HomeScreen>
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold,
                         color: Color(0xFF1E293B))),
               ),
-              ..._moreActions.map((a) => ListTile(
+              ..._visibleMoreActions.map((a) => ListTile(
                     leading: Container(
                       width: 40, height: 40,
                       decoration: BoxDecoration(

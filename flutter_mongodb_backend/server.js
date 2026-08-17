@@ -90,6 +90,96 @@ console.log(
   `Auth: project=${PROJECT_ID || 'UNSET'} enforcement=${ENFORCE ? 'ON' : 'OFF (soft mode)'}`
 );
 
+// The seed accounts are the owners: always allowed, always admin, and they
+// cannot be removed from the allow-list — otherwise a member added later could
+// lock the owners out of their own system.
+function isOwner(email) {
+  return SEED_EMAILS.includes((email || '').toLowerCase().trim());
+}
+
+// Managing who has access always requires a proven identity, regardless of
+// AUTH_ENFORCE.
+function requireAdmin(req, res, next) {
+  if (!req.user) return res.status(401).json({ message: 'Sign-in required' });
+  if (!isOwner(req.user.email)) {
+    return res.status(403).json({ message: 'Only the owner accounts can manage access' });
+  }
+  next();
+}
+
+async function saveAllowedEmails(emails) {
+  await Setting.findOneAndUpdate(
+    { key: 'allowedEmails' },
+    { $set: { value: emails, updatedAt: new Date() } },
+    { upsert: true }
+  );
+  allowCache = { emails: null, at: 0 }; // force a re-read on the next request
+}
+
+// Who am I? The app asks this after signing in, so the server — not a hardcoded
+// list in the client — decides whether the account may use the dashboard.
+app.get('/me', async (req, res) => {
+  if (!req.user) return res.status(401).json({ message: 'Sign-in required' });
+  res.json({
+    email: req.user.email,
+    name: req.user.name,
+    isAdmin: isOwner(req.user.email),
+    allowed: true, // reaching here means the middleware already allow-listed them
+  });
+});
+
+// ── Access management (owner accounts only) ──────────────────────────────────
+
+app.get('/admin/allowed-emails', requireAdmin, async (req, res) => {
+  try {
+    const emails = await allowedEmails();
+    res.json({
+      emails,
+      owners: SEED_EMAILS, // shown as protected in the UI
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+app.post('/admin/allowed-emails', requireAdmin, async (req, res) => {
+  try {
+    const email = String(req.body.email || '').toLowerCase().trim();
+    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      return res.status(400).json({ message: 'That does not look like an email address' });
+    }
+    const emails = await allowedEmails();
+    if (emails.includes(email)) {
+      return res.status(409).json({ message: 'That address already has access' });
+    }
+    const next = [...emails, email];
+    await saveAllowedEmails(next);
+    console.log(`Access granted to ${email} by ${req.user.email}`);
+    res.status(201).json({ emails: next, owners: SEED_EMAILS });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+app.delete('/admin/allowed-emails/:email', requireAdmin, async (req, res) => {
+  try {
+    const email = String(req.params.email || '').toLowerCase().trim();
+    if (isOwner(email)) {
+      return res.status(403).json({ message: 'Owner accounts cannot be removed' });
+    }
+    const emails = await allowedEmails();
+    if (!emails.includes(email)) {
+      return res.status(404).json({ message: 'That address is not on the list' });
+    }
+    const next = emails.filter((e) => e !== email);
+    await saveAllowedEmails(next);
+    console.log(`Access revoked from ${email} by ${req.user.email}`);
+    res.json({ emails: next, owners: SEED_EMAILS });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 const bookingSchema = new mongoose.Schema({
   roomNumber: String,   // legacy field (single-room bookings)
   roomType: String,     // legacy field (single-room bookings)
