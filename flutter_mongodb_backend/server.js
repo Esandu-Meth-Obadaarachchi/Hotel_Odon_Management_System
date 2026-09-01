@@ -15,6 +15,7 @@ const {
   updateStamp,
   auditFields,
 } = require('./auth');
+const cache = require('./cache');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -200,10 +201,53 @@ const bookingSchema = new mongoose.Schema({
   guestPhone: String,
   mealStart: String,  // 'Lunch' or 'Dinner' — first meal on arrival day for FB/HB
   needDriver: { type: Boolean, default: false },
+  // Head count. The rooms already imply a capacity (Double = 2, Family = 4 …)
+  // and that is what numAdults defaults to, but the front desk can correct it.
+  // Kids are recorded separately because they are never counted when picking a
+  // room — tracking them is the only way to notice a "kid" who arrives adult.
+  numAdults: Number,
+  numKids: Number,
   ...auditFields,     // createdBy / updatedBy — stamped from the verified token
 });
 
 const Booking = mongoose.model('Booking', bookingSchema);
+
+// Capacity implied by a room type — the same table the app uses when it shows
+// "2pax" on a room card.
+function paxForType(type) {
+  switch (type) {
+    case 'Single': return 1;
+    case 'Triple': return 3;
+    case 'Family': return 4;
+    case 'Family Plus': return 5;
+    default: return 2; // Double, and anything unrecognised
+  }
+}
+
+// Total capacity of the rooms on a booking, across both the new `rooms` array
+// and the legacy single-room fields.
+function roomCapacity(body) {
+  const rooms = Array.isArray(body.rooms) ? body.rooms : [];
+  if (rooms.length > 0) {
+    return rooms.reduce((sum, r) => {
+      const pax = Number.parseInt(r && r.pax, 10);
+      return sum + (Number.isFinite(pax) && pax > 0 ? pax : paxForType(r && r.roomType));
+    }, 0);
+  }
+  return body.roomType ? paxForType(body.roomType) : 0;
+}
+
+// Adults fall back to the room capacity so bookings made by an older client —
+// or written before this field existed — still report a sensible head count.
+// Kids have no sensible default other than zero.
+function headCount(body) {
+  const adults = Number.parseInt(body.numAdults, 10);
+  const kids = Number.parseInt(body.numKids, 10);
+  return {
+    numAdults: Number.isFinite(adults) && adults >= 0 ? adults : roomCapacity(body),
+    numKids: Number.isFinite(kids) && kids >= 0 ? kids : 0,
+  };
+}
 
 // Guest Schema — phone is the unique identifier
 const guestSchema = new mongoose.Schema({
@@ -284,10 +328,24 @@ app.put('/room-config', requireUser, async (req, res) => {
 });
 
 // Routes
+//
+// The whole collection, served from Redis when it is warm. Note the clients
+// pass date filters on the query string that this route has never applied —
+// they slice the list themselves — so a single cache key covers every caller.
 app.get('/bookings', async (req, res) => {
   try {
+    const cached = await cache.getBookings();
+    if (cached) {
+      res.set('X-Cache', 'HIT');
+      return res.json(cached);
+    }
+
     const bookings = await Booking.find();
+    res.set('X-Cache', cache.enabled() ? 'MISS' : 'BYPASS');
     res.json(bookings);
+    // After the response: a slow cache write must not delay the caller, and if
+    // it fails the client already has its data.
+    cache.setBookings(bookings);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -337,12 +395,14 @@ app.post('/bookings', requireUser, async (req, res) => {
     guestPhone: req.body.guestPhone,
     mealStart: req.body.mealStart,
     needDriver: req.body.needDriver ?? false,
+    ...headCount(req.body),
   });
 
   try {
     console.log('POST /bookings needDriver:', req.body.needDriver, '→', booking.needDriver);
     const newBooking = await booking.save();
     await upsertGuest(req.body.guestName, req.body.guestPhone);
+    await cache.invalidateBookings();
     res.status(201).json(newBooking);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -377,6 +437,7 @@ app.put('/bookings/:id', requireUser, async (req, res) => {
       guestPhone: req.body.guestPhone,
       mealStart: req.body.mealStart,
       needDriver: req.body.needDriver ?? false,
+      ...headCount(req.body),
       // Records who last touched it; createdBy is deliberately left alone.
       ...updateStamp(req),
     };
@@ -395,6 +456,7 @@ app.put('/bookings/:id', requireUser, async (req, res) => {
     }
 
     await upsertGuest(req.body.guestName, req.body.guestPhone);
+    await cache.invalidateBookings();
     res.json(updatedBooking);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -410,6 +472,7 @@ app.delete('/bookings/:id', requireUser, async (req, res) => {
 
     // Use deleteOne for the document
     await Booking.deleteOne({ _id: req.params.id });
+    await cache.invalidateBookings();
     res.json({ message: 'Booking deleted successfully' });
   } catch (err) {
     res.status(500).json({ message: err.message });
