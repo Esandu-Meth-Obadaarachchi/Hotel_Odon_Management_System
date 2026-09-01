@@ -7,7 +7,7 @@ class RoomSelectionScreen extends StatefulWidget {
   /// Optional prefill data (e.g. coming from the Generate Invoice screen).
   /// Recognised keys: guestName, guestPhone (String); checkIn, checkOut
   /// (DateTime); package, mealStart (String); total, advance, extraDetails
-  /// (String); needDriver (bool).
+  /// (String); needDriver (bool); numAdults, numKids (int).
   final Map<String, dynamic>? prefill;
 
   RoomSelectionScreen({this.prefill});
@@ -25,6 +25,13 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
   final TextEditingController _extraDetailsController = TextEditingController();
   final TextEditingController _totalCostController = TextEditingController();
   final TextEditingController _advanceAmountController = TextEditingController();
+  final TextEditingController _adultsController = TextEditingController();
+  final TextEditingController _kidsController = TextEditingController();
+
+  /// True once the adults box has been typed into. From then on the room
+  /// selection stops overwriting it — the user knows something the room type
+  /// does not.
+  bool _adultsEdited = false;
 
   List<Map<String, dynamic>> _roomConfig = [];
   bool _configLoading = true;
@@ -70,6 +77,18 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
 
     _needDriver = p['needDriver'] == true;
 
+    // The invoice already asked for the head count, so carry it over rather
+    // than making the front desk key it in twice. An adults figure that came
+    // from the invoice counts as user-entered: the rooms picked here must not
+    // overwrite it.
+    final adults = p['numAdults'];
+    if (adults is int && adults > 0) {
+      _adultsController.text = adults.toString();
+      _adultsEdited = true;
+    }
+    final kids = p['numKids'];
+    if (kids is int && kids > 0) _kidsController.text = kids.toString();
+
     final ci = p['checkIn'];
     final co = p['checkOut'];
     if (ci is DateTime && co is DateTime) {
@@ -113,6 +132,30 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
       default: return 2;
     }
   }
+
+  /// Combined capacity of the rooms currently selected. This is the number the
+  /// adults box starts from, because the room chosen is what implies the head
+  /// count — a Family room means four adults unless told otherwise.
+  int get _autoAdults => _selectedRooms.fold<int>(0, (sum, roomNum) {
+        final cfg = _roomConfig.firstWhere(
+          (r) => r['roomNumber'] == roomNum,
+          orElse: () => {},
+        );
+        return sum + (cfg.isEmpty ? 0 : _getPax(_getRoomType(cfg)));
+      });
+
+  /// Follows the room selection until the user types their own number.
+  /// Call inside setState, after the selection has changed.
+  void _syncAdults() {
+    if (_adultsEdited) return;
+    final auto = _autoAdults;
+    _adultsController.text = auto == 0 ? '' : auto.toString();
+  }
+
+  int get _adultsEntered =>
+      int.tryParse(_adultsController.text.trim()) ?? _autoAdults;
+
+  int get _kidsEntered => int.tryParse(_kidsController.text.trim()) ?? 0;
 
   Future<void> _selectCheckInDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
@@ -318,6 +361,8 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
       'guestName': _guestNameController.text,
       'guestPhone': _guestPhoneController.text,
       'needDriver': _needDriver,
+      'numAdults': _adultsEntered,
+      'numKids': _kidsEntered,
     };
 
     print('[DEBUG] Saving booking, needDriver=$_needDriver');
@@ -359,7 +404,22 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
       _checkOutDate = null;
       _numOfNights = 0;
       _needDriver = false;
+      _adultsController.clear();
+      _kidsController.clear();
+      _adultsEdited = false;
     });
+  }
+
+  @override
+  void dispose() {
+    _guestNameController.dispose();
+    _guestPhoneController.dispose();
+    _extraDetailsController.dispose();
+    _totalCostController.dispose();
+    _advanceAmountController.dispose();
+    _adultsController.dispose();
+    _kidsController.dispose();
+    super.dispose();
   }
 
   // ─── Room card ───────────────────────────────────────────────────────────────
@@ -405,6 +465,7 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                 } else {
                   _selectedRooms.add(roomNum);
                 }
+                _syncAdults();
               });
             },
       child: AnimatedContainer(
@@ -482,6 +543,7 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                       } else {
                         _extraBedRooms.add(roomNum);
                       }
+                      _syncAdults();
                     });
                   },
                   child: Container(
@@ -674,6 +736,132 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Adults + kids. Adults is prefilled from the rooms picked above and stays
+  /// in step with them until it is typed into; kids is always manual, because
+  /// children never enter into which room gets booked.
+  Widget _buildHeadCount() {
+    final auto = _autoAdults;
+    final kids = _kidsEntered;
+
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _indigoField(
+                    controller: _adultsController,
+                    label: 'Adults (Pax)',
+                    icon: Icons.person_outline_rounded,
+                    keyboardType: TextInputType.number,
+                    onChanged: (_) => setState(() => _adultsEdited = true),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _indigoField(
+                    controller: _kidsController,
+                    label: 'Kids',
+                    icon: Icons.child_care_rounded,
+                    keyboardType: TextInputType.number,
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            if (_adultsEdited && auto > 0 && _adultsEntered != auto)
+              // The rooms say one thing and the box says another. That is
+              // allowed — it is the whole point of the field — but the gap is
+              // worth showing, along with a one-tap way back.
+              Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, size: 13, color: Colors.orange.shade700),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Rooms selected fit $auto adults',
+                      style: TextStyle(fontSize: 11.5, color: Colors.orange.shade800),
+                    ),
+                  ),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(6),
+                    onTap: () => setState(() {
+                      _adultsEdited = false;
+                      _syncAdults();
+                    }),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      child: Text(
+                        'Reset',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.indigo.shade600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            else
+              Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, size: 13, color: Colors.grey.shade500),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      auto == 0
+                          ? 'Adults fills in once rooms are selected. Kids are never counted when picking a room — record them here.'
+                          : 'Adults comes from the rooms selected; edit it if the party differs. Kids are tracked separately.',
+                      style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
+                    ),
+                  ),
+                ],
+              ),
+            if (kids > 0) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: Colors.indigo.shade50,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.groups_rounded, size: 14, color: Colors.indigo.shade600),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Total in party: ${_adultsEntered + kids} '
+                      '($_adultsEntered adult${_adultsEntered == 1 ? '' : 's'}, '
+                      '$kids kid${kids == 1 ? '' : 's'})',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.indigo.shade700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -930,6 +1118,12 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                         _buildSelectedSummary(),
                         if (_selectedRooms.isNotEmpty) const SizedBox(height: 20),
 
+                        // ── Head count ────────────────────────────────────
+                        _sectionLabel('Head Count'),
+                        const SizedBox(height: 10),
+                        _buildHeadCount(),
+                        const SizedBox(height: 20),
+
                         // ── Options ───────────────────────────────────────
                         _sectionLabel('Options'),
                         const SizedBox(height: 10),
@@ -1180,11 +1374,13 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
     required IconData icon,
     int maxLines = 1,
     TextInputType keyboardType = TextInputType.text,
+    ValueChanged<String>? onChanged,
   }) {
     return TextFormField(
       controller: controller,
       maxLines: maxLines,
       keyboardType: keyboardType,
+      onChanged: onChanged,
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, color: Colors.indigo.shade400, size: 20),

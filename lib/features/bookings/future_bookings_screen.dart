@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:odon_booking/core/api/api_service.dart';
+import 'package:odon_booking/features/bookings/head_count.dart';
 import 'edit_booking_screen.dart';
 
 class FutureBookingsScreen extends StatefulWidget {
@@ -214,6 +215,7 @@ class _FutureBookingsScreenState extends State<FutureBookingsScreen> {
     final total = booking['total'] as String? ?? '';
     final advance = booking['advance'] as String? ?? '';
     final needDriver = booking['needDriver'] == true;
+    final headCount = headCountOf(booking);
 
     final checkIn =
         booking['checkIn'] != null ? DateTime.parse(booking['checkIn']) : null;
@@ -433,6 +435,17 @@ class _FutureBookingsScreenState extends State<FutureBookingsScreen> {
                     Expanded(
                         child: _detailItem(Icons.logout_rounded, 'Check-out',
                             _fmtDate(checkOut), Colors.red)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                        child: _detailItem(Icons.person_outline_rounded,
+                            'Adults', '${headCount.adults}', Colors.blueGrey)),
+                    Expanded(
+                        child: _detailItem(Icons.child_care_rounded, 'Kids',
+                            '${headCount.kids}', Colors.pink)),
                   ],
                 ),
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:odon_booking/core/api/api_service.dart';
+import 'package:odon_booking/features/bookings/head_count.dart';
 import 'package:odon_booking/features/invoices/booking_invoice.dart';
 import 'edit_booking_screen.dart';
 import 'future_bookings_screen.dart';
@@ -425,6 +426,7 @@ class _ViewBookingsScreenState extends State<ViewBookingsScreen> {
     final auditLine = _auditLine(booking);
 
     final needDriver = booking['needDriver'] == true;
+    final headCount = headCountOf(booking);
     final isNewFormat = booking['rooms'] != null && (booking['rooms'] as List).isNotEmpty;
     final rooms = isNewFormat
         ? List<Map<String, dynamic>>.from((booking['rooms'] as List).map((r) => Map<String, dynamic>.from(r)))
@@ -583,6 +585,13 @@ class _ViewBookingsScreenState extends State<ViewBookingsScreen> {
                   children: [
                     Expanded(child: _detailItem(Icons.login, 'Check-in', _fmtDate(checkIn), Colors.green)),
                     Expanded(child: _detailItem(Icons.logout, 'Check-out', _fmtDate(checkOut), Colors.red)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(child: _detailItem(Icons.person_outline, 'Adults', '${headCount.adults}', Colors.blueGrey)),
+                    Expanded(child: _detailItem(Icons.child_care, 'Kids', '${headCount.kids}', Colors.pink)),
                   ],
                 ),
 

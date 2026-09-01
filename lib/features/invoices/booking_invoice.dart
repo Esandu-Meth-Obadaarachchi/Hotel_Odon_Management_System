@@ -119,12 +119,21 @@ Future<void> shareBookingInvoice(
 
     // Group rooms by type for the invoice line items.
     final Map<String, int> typeCounts = {};
-    int numGuests = 0;
+    int roomCapacity = 0;
     for (final r in rooms) {
       final t = (r['roomType'] ?? 'Double').toString();
       typeCounts[t] = (typeCounts[t] ?? 0) + 1;
-      numGuests += (r['pax'] as int?) ?? _paxForType(t);
+      roomCapacity += (r['pax'] as int?) ?? _paxForType(t);
     }
+
+    // Prefer the head count recorded on the booking — the front desk may have
+    // corrected it — and fall back to the rooms' capacity for bookings saved
+    // before those fields existed.
+    final storedAdults = booking['numAdults'];
+    final numGuests =
+        (storedAdults is num && storedAdults > 0) ? storedAdults.toInt() : roomCapacity;
+    final storedKids = booking['numKids'];
+    final numKids = (storedKids is num && storedKids > 0) ? storedKids.toInt() : 0;
 
     final Map<String, Map<String, dynamic>> priceBreakdown = {};
     double rawSubtotal = 0;
@@ -185,6 +194,7 @@ Future<void> shareBookingInvoice(
       checkIn: dateFmt.format(checkInDate),
       checkOut: dateFmt.format(checkOutDate),
       numGuests: numGuests,
+      numKids: numKids,
       room: roomStr,
       packageDetails: package,
       startMeal: startMeal,

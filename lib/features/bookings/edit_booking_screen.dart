@@ -21,6 +21,8 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
   late TextEditingController advanceController;
   late TextEditingController guestNameController;
   late TextEditingController guestPhoneController;
+  late TextEditingController adultsController;
+  late TextEditingController kidsController;
 
   // Legacy fields (old single-room bookings)
   late TextEditingController roomNumberController;
@@ -60,6 +62,20 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
     guestNameController = TextEditingController(text: b['guestName'] as String? ?? '');
     guestPhoneController = TextEditingController(text: b['guestPhone'] as String? ?? '');
 
+    // Bookings saved before the head count existed have neither field. Adults
+    // falls back to the rooms' capacity so the box is never blank; kids has no
+    // sensible default other than zero.
+    final storedAdults = b['numAdults'];
+    adultsController = TextEditingController(
+      text: (storedAdults is num && storedAdults > 0)
+          ? storedAdults.toInt().toString()
+          : _roomCapacity.toString(),
+    );
+    final storedKids = b['numKids'];
+    kidsController = TextEditingController(
+      text: (storedKids is num && storedKids > 0) ? storedKids.toInt().toString() : '0',
+    );
+
     _balanceMethod = b['balanceMethod'] as String? ?? '';
     final savedMealStart = b['mealStart'] as String?;
     _mealStart = (savedMealStart == 'Lunch' || savedMealStart == 'Dinner') ? savedMealStart : null;
@@ -82,6 +98,8 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
     guestPhoneController.dispose();
     roomNumberController.dispose();
     roomTypeController.dispose();
+    adultsController.dispose();
+    kidsController.dispose();
     super.dispose();
   }
 
@@ -122,6 +140,10 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
       'guestName': guestNameController.text,
       'guestPhone': guestPhoneController.text,
       'needDriver': _needDriver,
+      // Always sent: the PUT replaces the whole document, so omitting these
+      // would wipe the head count off any booking that gets edited.
+      'numAdults': int.tryParse(adultsController.text.trim()) ?? _roomCapacity,
+      'numKids': int.tryParse(kidsController.text.trim()) ?? 0,
       if (_mealStart != null) 'mealStart': _mealStart,
       // Legacy fields
       if (!_isNewFormat) 'roomNumber': roomNumberController.text,
@@ -210,6 +232,25 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
               _buildField('Room Type', roomTypeController, icon: Icons.room_preferences),
               const SizedBox(height: 15),
             ],
+
+            // Head count — adults defaults to the rooms' capacity, kids are
+            // recorded by hand because they never affect the room chosen.
+            const Text('Head Count', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.indigo)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildField('Adults (Pax)', adultsController,
+                      icon: Icons.person_outline, keyboardType: TextInputType.number),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildField('Kids', kidsController,
+                      icon: Icons.child_care, keyboardType: TextInputType.number),
+                ),
+              ],
+            ),
+            const SizedBox(height: 15),
 
             // Package dropdown
             _buildDropdown(
@@ -382,10 +423,28 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
     }
   }
 
-  Widget _buildField(String label, TextEditingController controller, {IconData? icon, int maxLines = 1}) {
+  /// Combined capacity of this booking's rooms, across both the new per-room
+  /// list and the legacy single-room fields. Used only as the fallback for a
+  /// booking that predates the stored head count.
+  int get _roomCapacity {
+    if (_isNewFormat) {
+      return _rooms.fold<int>(0, (sum, r) {
+        final pax = r['pax'];
+        return sum +
+            (pax is num && pax > 0
+                ? pax.toInt()
+                : _paxForType((r['roomType'] ?? '').toString()));
+      });
+    }
+    return _paxForType(roomTypeController.text);
+  }
+
+  Widget _buildField(String label, TextEditingController controller,
+      {IconData? icon, int maxLines = 1, TextInputType? keyboardType}) {
     return TextField(
       controller: controller,
       maxLines: maxLines,
+      keyboardType: keyboardType,
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: icon != null ? Icon(icon, color: Colors.indigo) : null,

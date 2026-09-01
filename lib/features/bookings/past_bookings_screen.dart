@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:month_picker_dialog/month_picker_dialog.dart';
 import 'package:odon_booking/core/api/api_service.dart';
+import 'package:odon_booking/features/bookings/head_count.dart';
 
 class PastBookingsScreen extends StatefulWidget {
   @override
@@ -264,6 +265,7 @@ class _PastBookingsScreenState extends State<PastBookingsScreen> {
     final total = booking['total'] as String? ?? '';
     final advance = booking['advance'] as String? ?? '';
     final needDriver = booking['needDriver'] == true;
+    final headCount = headCountOf(booking);
 
     final checkIn =
         booking['checkIn'] != null ? DateTime.parse(booking['checkIn']) : null;
@@ -438,6 +440,17 @@ class _PastBookingsScreenState extends State<PastBookingsScreen> {
                     Expanded(
                         child: _detailItem(Icons.logout_rounded,
                             'Check-out', _fmtDate(checkOut), Colors.red)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                        child: _detailItem(Icons.person_outline_rounded,
+                            'Adults', '${headCount.adults}', Colors.blueGrey)),
+                    Expanded(
+                        child: _detailItem(Icons.child_care_rounded, 'Kids',
+                            '${headCount.kids}', Colors.pink)),
                   ],
                 ),
 

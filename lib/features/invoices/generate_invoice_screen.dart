@@ -35,6 +35,12 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
   final TextEditingController _additionalDiscountController = TextEditingController();
   final TextEditingController _specialNotesController = TextEditingController();
   final TextEditingController _advanceAmountController = TextEditingController();
+  final TextEditingController _adultsController = TextEditingController();
+  final TextEditingController _kidsController = TextEditingController();
+
+  /// True once the adults box has been typed into. From then on the room
+  /// selection stops overwriting it.
+  bool _adultsEdited = false;
 
   DateTime? _checkInDate;
   DateTime? _checkOutDate;
@@ -65,12 +71,27 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
     'Single': 1, 'Double': 2, 'Triple': 3, 'Family': 4, 'Family Plus': 5,
   };
 
-  int get _totalGuests {
+  /// Combined capacity of the rooms on the invoice. This is where the adults
+  /// box starts, because the rooms quoted are what imply the head count.
+  int get _autoAdults {
     int total = 0;
     for (var room in _selectedRooms) {
       total += _roomCapacity[room.type]! * room.quantity;
     }
     return total;
+  }
+
+  int get _adultsEntered =>
+      int.tryParse(_adultsController.text.trim()) ?? _autoAdults;
+
+  int get _kidsEntered => int.tryParse(_kidsController.text.trim()) ?? 0;
+
+  /// Follows the room selection until the user types their own number.
+  /// Call inside setState, after the rooms have changed.
+  void _syncAdults() {
+    if (_adultsEdited) return;
+    final auto = _autoAdults;
+    _adultsController.text = auto == 0 ? '' : auto.toString();
   }
 
   int get _totalRoomNights {
@@ -102,6 +123,7 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
     super.initState();
     _selectedRooms.add(Room('Double', 1));
     _extraCharges.add(ExtraCharge(reason: '', amount: 0.0));
+    _syncAdults(); // seed the adults box from the default room
     _fetchPrices();
   }
 
@@ -115,6 +137,8 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
     _additionalDiscountController.dispose();
     _specialNotesController.dispose();
     _advanceAmountController.dispose();
+    _adultsController.dispose();
+    _kidsController.dispose();
     super.dispose();
   }
 
@@ -172,6 +196,7 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
 
   void _addRoom() => setState(() {
     _selectedRooms.add(Room('Double', 1));
+    _syncAdults();
     _calculateTotal();
   });
 
@@ -179,6 +204,7 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
     if (_selectedRooms.length > 1) {
       setState(() {
         _selectedRooms.removeAt(index);
+        _syncAdults();
         _calculateTotal();
       });
     }
@@ -186,11 +212,13 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
 
   void _updateRoomType(int index, String type) => setState(() {
     _selectedRooms[index].type = type;
+    _syncAdults();
     _calculateTotal();
   });
 
   void _updateRoomQuantity(int index, int quantity) => setState(() {
     _selectedRooms[index].quantity = quantity;
+    _syncAdults();
     _calculateTotal();
   });
 
@@ -389,7 +417,9 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                                 const SizedBox(width: 8),
                                 _infoPill(
                                   icon: Icons.people_outline_rounded,
-                                  label: '$_totalGuests guests',
+                                  label: _kidsEntered > 0
+                                      ? '$_adultsEntered adults + $_kidsEntered kids'
+                                      : '$_adultsEntered guests',
                                 ),
                               ],
                             ),
@@ -544,6 +574,12 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                       onPressed: _addRoom,
                     ),
                     const SizedBox(height: 12),
+
+                    // ── Head count ──────────────────────────────────────
+                    _sectionLabel('Head Count'),
+                    const SizedBox(height: 10),
+                    _buildHeadCount(),
+                    const SizedBox(height: 20),
 
                     // ── Package & Options ───────────────────────────────
                     _sectionLabel('Package & Options'),
@@ -1081,6 +1117,122 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
 
   // ─── Helpers ─────────────────────────────────────────────────────────────
 
+  /// Adults + kids. Adults is prefilled from the rooms quoted above and stays
+  /// in step with them until it is typed into; kids is always manual, because
+  /// children never enter into which room gets quoted.
+  Widget _buildHeadCount() {
+    final auto = _autoAdults;
+    final kids = _kidsEntered;
+
+    return _card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _field(
+                  controller: _adultsController,
+                  label: 'Adults (Pax)',
+                  icon: Icons.person_outline_rounded,
+                  keyboardType: TextInputType.number,
+                  onChanged: (_) => setState(() => _adultsEdited = true),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _field(
+                  controller: _kidsController,
+                  label: 'Kids',
+                  icon: Icons.child_care_rounded,
+                  keyboardType: TextInputType.number,
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (_adultsEdited && auto > 0 && _adultsEntered != auto)
+            // The rooms say one thing and the box says another. That is
+            // allowed — it is the whole point of the field — but the gap is
+            // worth showing, along with a one-tap way back.
+            Row(
+              children: [
+                Icon(Icons.info_outline_rounded, size: 13, color: Colors.orange.shade700),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Rooms quoted fit $auto adults',
+                    style: TextStyle(fontSize: 11.5, color: Colors.orange.shade800),
+                  ),
+                ),
+                InkWell(
+                  borderRadius: BorderRadius.circular(6),
+                  onTap: () => setState(() {
+                    _adultsEdited = false;
+                    _syncAdults();
+                  }),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    child: Text(
+                      'Reset',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.indigo.shade600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            )
+          else
+            Row(
+              children: [
+                Icon(Icons.info_outline_rounded, size: 13, color: Colors.grey.shade500),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Adults comes from the rooms above; edit it if the party differs. '
+                    'Kids are counted separately and shown on the invoice.',
+                    style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
+                  ),
+                ),
+              ],
+            ),
+          if (kids > 0) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                color: Colors.indigo.shade50,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.groups_rounded, size: 14, color: Colors.indigo.shade600),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Total in party: ${_adultsEntered + kids} '
+                    '($_adultsEntered adult${_adultsEntered == 1 ? '' : 's'}, '
+                    '$kids kid${kids == 1 ? '' : 's'})',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.indigo.shade700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _card({required Widget child}) {
     return Card(
       elevation: 0,
@@ -1343,7 +1495,8 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
       guestPhone: _phoneController.text.isNotEmpty ? _phoneController.text : null,
       checkIn: _checkInController.text,
       checkOut: _checkOutController.text,
-      numGuests: _totalGuests,
+      numGuests: _adultsEntered,
+      numKids: _kidsEntered,
       room: roomDetails,
       packageDetails: packageDetails,
       startMeal: startMealForInvoice,
@@ -1395,6 +1548,8 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
       'advance': _advanceAmount.toStringAsFixed(2),
       'needDriver': _includeDriverRoom,
       'extraDetails': _specialNotesController.text,
+      'numAdults': _adultsEntered,
+      'numKids': _kidsEntered,
     };
   }
 
@@ -1427,6 +1582,14 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
     buffer.writeln('Package : $packageDetails');
     for (final line in roomLines) {
       buffer.writeln(line);
+    }
+    // Spelling the kids out here is what lets the guest correct it before
+    // arrival, rather than it being argued about at the desk.
+    if (_kidsEntered > 0) {
+      buffer.writeln(
+        '${_adultsEntered} ${_adultsEntered == 1 ? "adult" : "adults"} '
+        'and ${_kidsEntered} ${_kidsEntered == 1 ? "kid" : "kids"}',
+      );
     }
     buffer.writeln('Total : LKR ${fmt.format(_totalAmount)}');
     buffer.writeln('Advance : LKR ${fmt.format(_advanceAmount)}');
