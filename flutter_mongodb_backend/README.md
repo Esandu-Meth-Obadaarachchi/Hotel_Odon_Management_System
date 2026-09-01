@@ -8,6 +8,34 @@
 | `AUTH_ENFORCE` | no | `true` = reject requests with no sign-in. Defaults to `false`. |
 | `ALLOWED_EMAILS` | no | Comma-separated seed for the allow-list. Only used on first boot. |
 | `MONGO_URI` | no | Falls back to the URI hardcoded in `server.js` — see security note. |
+| `UPSTASH_REDIS_REST_URL` | no | Upstash REST endpoint. Unset = no cache, Mongo is read every time. |
+| `UPSTASH_REDIS_REST_TOKEN` | no | Upstash REST token. Both this and the URL must be set for the cache to run. |
+| `BOOKINGS_CACHE_TTL` | no | Seconds a cached bookings list may live. Defaults to `300`. |
+
+## Bookings cache
+
+`GET /bookings` returns the whole collection — around 1275 documents, ~520 KB —
+and the view-bookings calendar re-reads it every time it opens or the month
+changes. That list is served from Upstash Redis under the key `bookings:all`.
+
+Correctness comes from invalidation, not from the clock: `POST`, `PUT` and
+`DELETE` on `/bookings` all drop the key, so the next read rebuilds it from
+Mongo. `BOOKINGS_CACHE_TTL` is only a backstop — it bounds how long a stale
+list could survive an edit made *outside* this API (Compass, a script, an
+instance whose `DEL` failed).
+
+Entries are stored gzipped (520 KB → 49 KB), well inside Upstash's 1 MB record
+limit, and a size guard skips the write rather than failing silently if the
+list ever outgrows it.
+
+The cache is optional. With the two `UPSTASH_*` variables unset, or if Upstash
+is unreachable, every read falls through to Mongo and the API behaves exactly
+as it did before. Responses carry an `X-Cache` header — `HIT`, `MISS`, or
+`BYPASS` when no cache is configured — so a stale read is diagnosable:
+
+```
+curl -sD - -o /dev/null https://<backend>/bookings | grep -i x-cache
+```
 
 ## Rollout order — important
 
