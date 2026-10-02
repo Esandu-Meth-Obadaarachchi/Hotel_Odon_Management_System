@@ -288,6 +288,46 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
     }
   }
 
+  /// Takes the amenities for the booked rooms out of stock. The item updates
+  /// are independent, so they go out together instead of one after another.
+  /// Returns true when stock is short or the inventory could not be updated.
+  Future<bool> _deductInventory(Map<String, int> totalDeductions) async {
+    final List<dynamic> inventoryItems;
+    try {
+      inventoryItems = await _apiService.fetchInventoryItems();
+    } catch (_) {
+      return true;
+    }
+
+    bool hasInventoryIssue = false;
+    final updates = <Future<void>>[];
+    for (final entry in totalDeductions.entries) {
+      final item = inventoryItems.firstWhere(
+        (i) => i['item_name'].toString().toLowerCase() == entry.key,
+        orElse: () => null,
+      );
+      if (item == null) {
+        hasInventoryIssue = true;
+        continue;
+      }
+      final updated = (item['quantity'] ?? 0) - entry.value;
+      if (updated < 0) {
+        hasInventoryIssue = true;
+        continue;
+      }
+      updates.add(_apiService
+          .updateInventoryItem(item['_id'], {
+            'item_name': item['item_name'],
+            'quantity': updated,
+          })
+          .catchError((_) {
+            hasInventoryIssue = true;
+          }));
+    }
+    await Future.wait(updates);
+    return hasInventoryIssue;
+  }
+
   Future<void> _saveBooking() async {
     if (_checkInDate == null ||
         _checkOutDate == null ||
@@ -319,45 +359,6 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
       }
     }
 
-    List<dynamic> inventoryItems;
-    try {
-      inventoryItems = await _apiService.fetchInventoryItems();
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to fetch inventory: $e')),
-      );
-      return;
-    }
-
-    bool hasInventoryIssue = false;
-    for (final key in totalDeductions.keys) {
-      final item = inventoryItems.firstWhere(
-        (i) => i['item_name'].toString().toLowerCase() == key,
-        orElse: () => null,
-      );
-      if (item == null || (item['quantity'] ?? 0) < totalDeductions[key]!) {
-        hasInventoryIssue = true;
-      }
-    }
-
-    for (final key in totalDeductions.keys) {
-      final item = inventoryItems.firstWhere(
-        (i) => i['item_name'].toString().toLowerCase() == key,
-        orElse: () => null,
-      );
-      if (item != null) {
-        final updated = (item['quantity'] ?? 0) - totalDeductions[key]!;
-        if (updated >= 0) {
-          try {
-            await _apiService.updateInventoryItem(item['_id'], {
-              'item_name': item['item_name'],
-              'quantity': updated,
-            });
-          } catch (_) {}
-        }
-      }
-    }
-
     final normalizedCheckIn = DateTime.utc(_checkInDate!.year, _checkInDate!.month, _checkInDate!.day);
     final normalizedCheckOut = DateTime.utc(_checkOutDate!.year, _checkOutDate!.month, _checkOutDate!.day);
 
@@ -384,7 +385,8 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
       'extraCharges': _extraCharges,
     };
 
-    print('[DEBUG] Saving booking, needDriver=$_needDriver');
+    // The booking is saved first: if it fails, no stock has been taken for
+    // a stay that does not exist.
     try {
       await _apiService.addBooking(newBooking);
     } catch (e) {
@@ -393,6 +395,9 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
       );
       return;
     }
+
+    final hasInventoryIssue = await _deductInventory(totalDeductions);
+    if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
