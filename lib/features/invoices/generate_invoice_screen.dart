@@ -1550,6 +1550,11 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
       'extraDetails': _specialNotesController.text,
       'numAdults': _adultsEntered,
       'numKids': _kidsEntered,
+      // Already counted in the total above; the booking keeps the breakdown.
+      'extraCharges': _extraCharges
+          .where((c) => c.reason.trim().isNotEmpty || c.amount != 0)
+          .map((c) => {'reason': c.reason.trim(), 'amount': c.amount})
+          .toList(),
     };
   }
 

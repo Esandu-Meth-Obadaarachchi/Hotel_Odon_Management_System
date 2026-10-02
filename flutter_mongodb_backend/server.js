@@ -207,6 +207,13 @@ const bookingSchema = new mongoose.Schema({
   // room — tracking them is the only way to notice a "kid" who arrives adult.
   numAdults: Number,
   numKids: Number,
+  // Itemised extras (late check-out fee, extra dinner …). The booking's total
+  // already includes them; this keeps the reason next to each amount.
+  extraCharges: [{
+    _id: false,
+    reason: String,
+    amount: Number,
+  }],
   ...auditFields,     // createdBy / updatedBy — stamped from the verified token
 });
 
@@ -247,6 +254,20 @@ function headCount(body) {
     numAdults: Number.isFinite(adults) && adults >= 0 ? adults : roomCapacity(body),
     numKids: Number.isFinite(kids) && kids >= 0 ? kids : 0,
   };
+}
+
+// Cleans the extra charges sent by the app: drops blank rows and anything
+// that is not a number. Returns undefined when the field was not sent, so an
+// older client editing a booking leaves the stored charges alone.
+function cleanExtraCharges(list) {
+  if (!Array.isArray(list)) return undefined;
+  return list
+    .map((c) => ({
+      reason: String((c && c.reason) ?? '').trim(),
+      amount: Number(c && c.amount),
+    }))
+    .filter((c) => c.reason || (Number.isFinite(c.amount) && c.amount !== 0))
+    .map((c) => ({ reason: c.reason, amount: Number.isFinite(c.amount) ? c.amount : 0 }));
 }
 
 // Guest Schema — phone is the unique identifier
@@ -396,6 +417,7 @@ app.post('/bookings', requireUser, async (req, res) => {
     mealStart: req.body.mealStart,
     needDriver: req.body.needDriver ?? false,
     ...headCount(req.body),
+    extraCharges: cleanExtraCharges(req.body.extraCharges) ?? [],
   });
 
   try {
@@ -438,6 +460,9 @@ app.put('/bookings/:id', requireUser, async (req, res) => {
       mealStart: req.body.mealStart,
       needDriver: req.body.needDriver ?? false,
       ...headCount(req.body),
+      ...(Array.isArray(req.body.extraCharges) && {
+        extraCharges: cleanExtraCharges(req.body.extraCharges),
+      }),
       // Records who last touched it; createdBy is deliberately left alone.
       ...updateStamp(req),
     };

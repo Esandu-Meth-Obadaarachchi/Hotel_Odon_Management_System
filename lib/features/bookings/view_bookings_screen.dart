@@ -7,6 +7,7 @@ import 'edit_booking_screen.dart';
 import 'future_bookings_screen.dart';
 import 'past_bookings_screen.dart';
 import 'selected_day_booking.dart';
+import 'package:odon_booking/features/bookings/widgets/extra_charges.dart';
 
 class ViewBookingsScreen extends StatefulWidget {
   @override
@@ -415,6 +416,7 @@ class _ViewBookingsScreenState extends State<ViewBookingsScreen> {
     final guestPhone = booking['guestPhone'] as String? ?? '';
     final package = booking['package'] as String? ?? 'N/A';
     final extraDetails = (booking['extraDetails'] as String?)?.trim() ?? '';
+    final extraCharges = extraChargesOf(booking);
     final numOfNights = booking['num_of_nights']?.toString() ?? 'N/A';
     final total = booking['total'] as String? ?? '';
     final advance = booking['advance'] as String? ?? '';
@@ -606,6 +608,11 @@ class _ViewBookingsScreenState extends State<ViewBookingsScreen> {
                         Expanded(child: _detailItem(Icons.payments, 'Advance', 'LKR $advance', Colors.orange)),
                     ],
                   ),
+                ],
+
+                if (extraCharges.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  ExtraChargesSummary(charges: extraCharges),
                 ],
 
                 // ── Extra details ─────────────────────────────────────────────

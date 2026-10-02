@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:odon_booking/core/api/api_service.dart';
 import 'package:odon_booking/features/guests/widgets/guest_name_autocomplete.dart';
+import 'widgets/extra_charges.dart';
 import 'widgets/room_picker.dart';
 
 class EditBookingScreen extends StatefulWidget {
@@ -43,6 +44,7 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
   String _balanceDisplay = 'N/A';
   String? _mealStart;
   bool _needDriver = false;
+  List<Map<String, dynamic>> _extraCharges = [];
 
   static const _packages = ['Full Board', 'Half Board', 'Room Only', 'BnB', 'Dinner Only'];
   static const _mealStarts = ['Lunch', 'Dinner'];
@@ -100,6 +102,7 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
     final savedMealStart = b['mealStart'] as String?;
     _mealStart = (savedMealStart == 'Lunch' || savedMealStart == 'Dinner') ? savedMealStart : null;
     _needDriver = b['needDriver'] == true;
+    _extraCharges = extraChargesOf(b);
 
     totalController.addListener(_recalcBalance);
     advanceController.addListener(_recalcBalance);
@@ -329,6 +332,7 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
       'numKids': int.tryParse(kidsController.text.trim()) ?? 0,
       if (_mealStart != null) 'mealStart': _mealStart,
       'rooms': _roomsData,
+      'extraCharges': _extraCharges,
       // Clears the old single-room fields so a converted legacy booking is
       // read in the multi-room format everywhere.
       'roomNumber': null,
@@ -496,6 +500,23 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
 
             _buildField('Extra Details', extraDetailsController, icon: Icons.notes, maxLines: 3),
             const SizedBox(height: 20),
+            const Text('Extra Charges', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.indigo)),
+            const SizedBox(height: 4),
+            Text('Changes here update the Total Cost below.',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+            const SizedBox(height: 10),
+            ExtraChargesEditor(
+              initialCharges: _extraCharges,
+              onChanged: (charges) => setState(() {
+                totalController.text = adjustTotalForCharges(
+                  totalController.text,
+                  sumExtraCharges(_extraCharges),
+                  sumExtraCharges(charges),
+                );
+                _extraCharges = charges;
+              }),
+            ),
+            const SizedBox(height: 15),
             _buildField('Total Cost', totalController, icon: Icons.monetization_on),
             const SizedBox(height: 20),
             _buildField('Advance', advanceController, icon: Icons.attach_money),

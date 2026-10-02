@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:odon_booking/core/api/api_service.dart';
 import 'package:odon_booking/features/guests/widgets/guest_name_autocomplete.dart';
+import 'widgets/extra_charges.dart';
 import 'widgets/room_picker.dart';
 
 class RoomSelectionScreen extends StatefulWidget {
@@ -40,6 +41,9 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
   String? _mealStart;
   bool _needDriver = false;
 
+  List<Map<String, dynamic>> _extraCharges = [];
+  final GlobalKey<ExtraChargesEditorState> _chargesKey = GlobalKey();
+
   Set<String> _selectedRooms = {};
   Set<String> _extraBedRooms = {};
   Set<String> _bookedRooms = {};
@@ -77,6 +81,9 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
     }
 
     _needDriver = p['needDriver'] == true;
+
+    // The invoice total already includes these, so they carry over as-is.
+    _extraCharges = extraChargesOf(p);
 
     // The invoice already asked for the head count, so carry it over rather
     // than making the front desk key it in twice. An adults figure that came
@@ -352,6 +359,7 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
       'needDriver': _needDriver,
       'numAdults': _adultsEntered,
       'numKids': _kidsEntered,
+      'extraCharges': _extraCharges,
     };
 
     print('[DEBUG] Saving booking, needDriver=$_needDriver');
@@ -393,6 +401,8 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
       _checkOutDate = null;
       _numOfNights = 0;
       _needDriver = false;
+      _extraCharges = [];
+      _chargesKey.currentState?.reset();
       _adultsController.clear();
       _kidsController.clear();
       _adultsEdited = false;
@@ -992,6 +1002,31 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                                   label: 'Advance Amount (LKR)',
                                   icon: Icons.payments_outlined,
                                   keyboardType: TextInputType.number,
+                                ),
+                                const SizedBox(height: 12),
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    'Extra charges (added to the total)',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                ExtraChargesEditor(
+                                  key: _chargesKey,
+                                  initialCharges: _extraCharges,
+                                  onChanged: (charges) => setState(() {
+                                    _totalCostController.text = adjustTotalForCharges(
+                                      _totalCostController.text,
+                                      sumExtraCharges(_extraCharges),
+                                      sumExtraCharges(charges),
+                                    );
+                                    _extraCharges = charges;
+                                  }),
                                 ),
                                 const SizedBox(height: 12),
                                 _indigoField(
