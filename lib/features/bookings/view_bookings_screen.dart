@@ -7,6 +7,7 @@ import 'edit_booking_screen.dart';
 import 'future_bookings_screen.dart';
 import 'past_bookings_screen.dart';
 import 'selected_day_booking.dart';
+import 'package:odon_booking/features/bookings/widgets/booking_flags.dart';
 import 'package:odon_booking/features/bookings/widgets/extra_charges.dart';
 
 class ViewBookingsScreen extends StatefulWidget {
@@ -547,6 +548,8 @@ class _ViewBookingsScreenState extends State<ViewBookingsScreen> {
                     ],
                   ),
                 ],
+
+                BookingFlagBadges(booking: booking),
 
                 if (needDriver) ...[
                   const SizedBox(height: 8),

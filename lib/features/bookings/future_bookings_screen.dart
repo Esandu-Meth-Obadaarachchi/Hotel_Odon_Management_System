@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:odon_booking/core/api/api_service.dart';
 import 'package:odon_booking/features/bookings/head_count.dart';
 import 'edit_booking_screen.dart';
+import 'package:odon_booking/features/bookings/widgets/booking_flags.dart';
 import 'package:odon_booking/features/bookings/widgets/extra_charges.dart';
 
 class FutureBookingsScreen extends StatefulWidget {
@@ -385,6 +386,8 @@ class _FutureBookingsScreenState extends State<FutureBookingsScreen> {
                     }),
                   ]),
                 ],
+
+                BookingFlagBadges(booking: booking),
 
                 if (needDriver) ...[
                   const SizedBox(height: 8),

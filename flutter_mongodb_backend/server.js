@@ -201,6 +201,7 @@ const bookingSchema = new mongoose.Schema({
   guestPhone: String,
   mealStart: String,  // 'Lunch' or 'Dinner' — first meal on arrival day for FB/HB
   needDriver: { type: Boolean, default: false },
+  needKiriPidu: { type: Boolean, default: false },
   // Head count. The rooms already imply a capacity (Double = 2, Family = 4 …)
   // and that is what numAdults defaults to, but the front desk can correct it.
   // Kids are recorded separately because they are never counted when picking a
@@ -416,6 +417,7 @@ app.post('/bookings', requireUser, async (req, res) => {
     guestPhone: req.body.guestPhone,
     mealStart: req.body.mealStart,
     needDriver: req.body.needDriver ?? false,
+    needKiriPidu: req.body.needKiriPidu ?? false,
     ...headCount(req.body),
     extraCharges: cleanExtraCharges(req.body.extraCharges) ?? [],
   });
@@ -459,6 +461,7 @@ app.put('/bookings/:id', requireUser, async (req, res) => {
       guestPhone: req.body.guestPhone,
       mealStart: req.body.mealStart,
       needDriver: req.body.needDriver ?? false,
+      needKiriPidu: req.body.needKiriPidu ?? false,
       ...headCount(req.body),
       ...(Array.isArray(req.body.extraCharges) && {
         extraCharges: cleanExtraCharges(req.body.extraCharges),

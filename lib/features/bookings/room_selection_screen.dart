@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:odon_booking/core/api/api_service.dart';
 import 'package:odon_booking/features/guests/widgets/guest_name_autocomplete.dart';
+import 'widgets/booking_flags.dart';
 import 'widgets/extra_charges.dart';
 import 'widgets/room_picker.dart';
 
@@ -40,6 +41,7 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
 
   String? _mealStart;
   bool _needDriver = false;
+  bool _needKiriPidu = false;
 
   List<Map<String, dynamic>> _extraCharges = [];
   final GlobalKey<ExtraChargesEditorState> _chargesKey = GlobalKey();
@@ -357,6 +359,7 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
       'guestName': _guestNameController.text,
       'guestPhone': _guestPhoneController.text,
       'needDriver': _needDriver,
+      'needKiriPidu': _needKiriPidu,
       'numAdults': _adultsEntered,
       'numKids': _kidsEntered,
       'extraCharges': _extraCharges,
@@ -401,6 +404,7 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
       _checkOutDate = null;
       _numOfNights = 0;
       _needDriver = false;
+      _needKiriPidu = false;
       _extraCharges = [];
       _chargesKey.currentState?.reset();
       _adultsController.clear();
@@ -973,6 +977,15 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                               ),
                             ),
                           ),
+                        ),
+                        const SizedBox(height: 10),
+                        OptionToggleCard(
+                          icon: Icons.rice_bowl_rounded,
+                          title: 'Need Kiri Pidu',
+                          subtitle: 'Prepare kiri pidu for this booking',
+                          value: _needKiriPidu,
+                          color: Colors.teal,
+                          onChanged: (v) => setState(() => _needKiriPidu = v),
                         ),
                         const SizedBox(height: 20),
 

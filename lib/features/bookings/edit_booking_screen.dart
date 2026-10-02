@@ -44,6 +44,7 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
   String _balanceDisplay = 'N/A';
   String? _mealStart;
   bool _needDriver = false;
+  bool _needKiriPidu = false;
   List<Map<String, dynamic>> _extraCharges = [];
 
   static const _packages = ['Full Board', 'Half Board', 'Room Only', 'BnB', 'Dinner Only'];
@@ -102,6 +103,7 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
     final savedMealStart = b['mealStart'] as String?;
     _mealStart = (savedMealStart == 'Lunch' || savedMealStart == 'Dinner') ? savedMealStart : null;
     _needDriver = b['needDriver'] == true;
+    _needKiriPidu = b['needKiriPidu'] == true;
     _extraCharges = extraChargesOf(b);
 
     totalController.addListener(_recalcBalance);
@@ -326,6 +328,7 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
       'guestName': guestNameController.text,
       'guestPhone': guestPhoneController.text,
       'needDriver': _needDriver,
+      'needKiriPidu': _needKiriPidu,
       // Always sent: the PUT replaces the whole document, so omitting these
       // would wipe the head count off any booking that gets edited.
       'numAdults': int.tryParse(adultsController.text.trim()) ?? _roomCapacity,
@@ -562,6 +565,19 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
                 const Icon(Icons.drive_eta, size: 18, color: Colors.indigo),
                 const SizedBox(width: 8),
                 const Text('Requires Driver Room', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+              ],
+            ),
+            Row(
+              children: [
+                Checkbox(
+                  value: _needKiriPidu,
+                  activeColor: Colors.indigo,
+                  onChanged: (v) => setState(() => _needKiriPidu = v ?? false),
+                ),
+                const SizedBox(width: 4),
+                const Icon(Icons.rice_bowl_rounded, size: 18, color: Colors.indigo),
+                const SizedBox(width: 8),
+                const Text('Need Kiri Pidu', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
               ],
             ),
             const SizedBox(height: 30),

@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:month_picker_dialog/month_picker_dialog.dart';
 import 'package:odon_booking/core/api/api_service.dart';
 import 'package:odon_booking/features/bookings/head_count.dart';
+import 'package:odon_booking/features/bookings/widgets/booking_flags.dart';
 import 'package:odon_booking/features/bookings/widgets/extra_charges.dart';
 
 class PastBookingsScreen extends StatefulWidget {
@@ -390,6 +391,8 @@ class _PastBookingsScreenState extends State<PastBookingsScreen> {
                     }),
                   ]),
                 ],
+
+                BookingFlagBadges(booking: booking),
 
                 if (needDriver) ...[
                   const SizedBox(height: 8),
