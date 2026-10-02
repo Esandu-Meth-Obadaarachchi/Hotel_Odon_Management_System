@@ -327,6 +327,7 @@ The Generate Invoice screen has the same Kiri Pidu, Early Check-in and Late Chec
 
 ## Performance Notes
 
+- Responses are gzipped by the `compression` middleware (bookings list ~500 KB down to under 100 KB). Browsers and Dart's `HttpClient` decompress automatically.
 - Indexes: Booking `checkIn`, `guestPhone`; Salary `date`; Expense `date`.
 - Read routes use `.lean()`; the JSON is the same as before.
 - Add Booking saves the booking first, then deducts inventory with all item updates in parallel (`_deductInventory`).
