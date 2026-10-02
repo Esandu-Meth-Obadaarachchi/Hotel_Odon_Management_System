@@ -30,7 +30,7 @@ bool isAllowedEmail(String? email) {
   return kAllowedEmails.contains(email.trim().toLowerCase());
 }
 
-/// Web-only entry widget. Watches Firebase auth state and only lets the two
+/// Entry widget wherever sign-in is set up (web, and Android once configured). Watches Firebase auth state and only lets the two
 /// allow-listed accounts through to [HomeScreen]. Everyone else sees the login
 /// page (or an "access denied" message if they signed in with a wrong account).
 class AuthGate extends StatelessWidget {
