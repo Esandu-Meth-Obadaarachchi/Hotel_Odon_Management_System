@@ -6,6 +6,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const cors = require('cors');
+const compression = require('compression');
 const {
   ENFORCE,
   PROJECT_ID,
@@ -21,6 +22,10 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // Middleware
+// Gzip every JSON response the client accepts it for. The bookings list is
+// ~500 KB and the home screen re-reads it every 30 s; compressed it is under
+// 100 KB. Browsers and Dart's HttpClient decompress it automatically.
+app.use(compression());
 app.use(cors());
 app.use(bodyParser.json());
 
@@ -222,7 +227,15 @@ const bookingSchema = new mongoose.Schema({
     amount: Number,
   }],
   ...auditFields,     // createdBy / updatedBy — stamped from the verified token
+  // Set by createStamp. Without it in the schema Mongoose dropped the value, so
+  // every booking looked edited (updatedAt vs a missing createdAt).
+  createdAt: { type: Date, default: null },
 });
+
+// The calendar and range screens filter on check-in; the guest screens look
+// bookings up by phone (and GET /guests joins on it).
+bookingSchema.index({ checkIn: 1 });
+bookingSchema.index({ guestPhone: 1 });
 
 const Booking = mongoose.model('Booking', bookingSchema);
 
@@ -383,7 +396,9 @@ app.get('/bookings', async (req, res) => {
       return res.json(cached);
     }
 
-    const bookings = await Booking.find();
+    // lean(): plain objects serialise to the same JSON without building a
+    // full Mongoose document for each of the ~1,300 bookings.
+    const bookings = await Booking.find().lean();
     res.set('X-Cache', cache.enabled() ? 'MISS' : 'BYPASS');
     res.json(bookings);
     // After the response: a slow cache write must not delay the caller, and if
@@ -403,6 +418,9 @@ const salarySchema = new mongoose.Schema({
   ...auditFields,
 });
 
+// Monthly salary reports query by date.
+salarySchema.index({ date: 1 });
+
 const Salary = mongoose.model('Salary', salarySchema);
 
 // Expense Schema
@@ -415,6 +433,9 @@ const expenseSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
   ...auditFields,
 });
+
+// Monthly expense reports query by date.
+expenseSchema.index({ date: 1 });
 
 const Expense = mongoose.model('Expense', expenseSchema);
 // Routes
@@ -447,8 +468,12 @@ app.post('/bookings', requireUser, async (req, res) => {
   try {
     console.log('POST /bookings needDriver:', req.body.needDriver, '→', booking.needDriver);
     const newBooking = await booking.save();
-    await upsertGuest(req.body.guestName, req.body.guestPhone);
-    await cache.invalidateBookings();
+    // Independent of each other, so run them side by side. Both finish before
+    // the reply, so the next read never sees a stale cached list.
+    await Promise.all([
+      upsertGuest(req.body.guestName, req.body.guestPhone),
+      cache.invalidateBookings(),
+    ]);
     res.status(201).json(newBooking);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -506,8 +531,12 @@ app.put('/bookings/:id', requireUser, async (req, res) => {
       return res.status(404).json({ message: 'Booking not found' });
     }
 
-    await upsertGuest(req.body.guestName, req.body.guestPhone);
-    await cache.invalidateBookings();
+    // Independent of each other, so run them side by side. Both finish before
+    // the reply, so the next read never sees a stale cached list.
+    await Promise.all([
+      upsertGuest(req.body.guestName, req.body.guestPhone),
+      cache.invalidateBookings(),
+    ]);
     res.json(updatedBooking);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -595,7 +624,8 @@ app.get('/guests/search', async (req, res) => {
       $or: [{ name: regex }, { phone: regex }],
     })
       .limit(10)
-      .sort({ updatedAt: -1 });
+      .sort({ updatedAt: -1 })
+      .lean();
     res.json(guests);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -616,7 +646,7 @@ app.get('/guests/:phone', async (req, res) => {
 // Get all bookings for a guest (sorted most recent first)
 app.get('/guests/:phone/bookings', async (req, res) => {
   try {
-    const bookings = await Booking.find({ guestPhone: req.params.phone }).sort({ checkIn: -1 });
+    const bookings = await Booking.find({ guestPhone: req.params.phone }).sort({ checkIn: -1 }).lean();
     res.json(bookings);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -652,7 +682,7 @@ const Inventory = mongoose.model('Inventory', inventorySchema);
 // Get all inventory items
 app.get('/inventory', async (req, res) => {
   try {
-    const items = await Inventory.find();
+    const items = await Inventory.find().lean();
     res.json(items);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -743,7 +773,7 @@ app.delete('/inventory/:id', requireUser, async (req, res) => {
 // Get all salary records
 app.get('/salaries', async (req, res) => {
   try {
-    const salaries = await Salary.find().sort({ createdAt: -1 });
+    const salaries = await Salary.find().sort({ createdAt: -1 }).lean();
     res.json(salaries);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -822,7 +852,7 @@ app.delete('/salaries/:id', requireUser, async (req, res) => {
 // Get all expense records
 app.get('/expenses', async (req, res) => {
   try {
-    const expenses = await Expense.find().sort({ createdAt: -1 });
+    const expenses = await Expense.find().sort({ createdAt: -1 }).lean();
     res.json(expenses);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -912,7 +942,7 @@ app.get('/expenses/month/:year/:month', async (req, res) => {
         $gte: startDate,
         $lte: endDate
       }
-    }).sort({ date: -1 });
+    }).sort({ date: -1 }).lean();
 
     res.json(expenses);
   } catch (err) {
@@ -973,7 +1003,7 @@ app.get('/salaries/month/:year/:month', async (req, res) => {
         $gte: startDate,
         $lte: endDate
       }
-    }).sort({ date: -1 });
+    }).sort({ date: -1 }).lean();
 
     res.json(salaries);
   } catch (err) {

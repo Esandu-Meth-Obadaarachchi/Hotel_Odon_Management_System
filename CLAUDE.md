@@ -318,6 +318,20 @@ The Generate Invoice screen has the same Kiri Pidu, Early Check-in and Late Chec
 
 `BookingFlagBadges` renders all three flag badges and is used on the view, full-day, past and upcoming booking cards.
 
+## Audit Trail ("Added by" / "edited by")
+
+- The backend stamps `createdBy` / `createdByName` / `updatedBy` / `updatedByName` / `createdAt` / `updatedAt` from the verified Firebase ID token (`createStamp` / `updateStamp` in `flutter_mongodb_backend/auth.js`). No token means no name, so the booking card shows no audit line.
+- Sign-in (and so attribution) needs Firebase initialised on that platform. Web always has it. Android has it through `DefaultFirebaseOptions.android` in `lib/firebase_options.dart` (the Android app registered in the **odon-dashboard-fin** project). An APK signed with a key whose SHA-1 is not registered there cannot sign in; add each build machine's SHA-1 in the Firebase console.
+- `android/app/google-services.json` is the odon-dashboard-fin Android app (debug-key SHA-1 registered). The Dart options above are what the app reads; the JSON is kept for reference since the Gradle google-services plugin is not applied.
+- The view card falls back to the ObjectId timestamp for `createdAt` on bookings saved before `createdAt` was stored.
+
+## Performance Notes
+
+- Responses are gzipped by the `compression` middleware (bookings list ~500 KB down to under 100 KB). Browsers and Dart's `HttpClient` decompress automatically.
+- Indexes: Booking `checkIn`, `guestPhone`; Salary `date`; Expense `date`.
+- Read routes use `.lean()`; the JSON is the same as before.
+- Add Booking saves the booking first, then deducts inventory with all item updates in parallel (`_deductInventory`).
+
 ## Packages
 
 Available package types: `Full Board`, `Half Board`, `Room Only`, `BnB`, `Dinner Only`

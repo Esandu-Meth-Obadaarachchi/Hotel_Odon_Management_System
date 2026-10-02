@@ -674,7 +674,8 @@ class _ViewBookingsScreenState extends State<ViewBookingsScreen> {
     }
     // Only worth showing the editor when it is a genuine later edit.
     final updatedAt = DateTime.tryParse(booking['updatedAt'] as String? ?? '');
-    final createdAt = DateTime.tryParse(booking['createdAt'] as String? ?? '');
+    final createdAt = DateTime.tryParse(booking['createdAt'] as String? ?? '') ??
+        _createdFromId(booking['_id']);
     final wasEdited = updatedAt != null &&
         (createdAt == null || updatedAt.difference(createdAt).inSeconds > 5);
     if (updatedBy.isNotEmpty && wasEdited) {
@@ -699,6 +700,17 @@ class _ViewBookingsScreenState extends State<ViewBookingsScreen> {
         ],
       ),
     );
+  }
+
+  /// When a record was created, read from its Mongo ObjectId: the first 8 hex
+  /// characters are the creation time in seconds. Covers bookings saved before
+  /// createdAt was stored, which otherwise all looked edited.
+  DateTime? _createdFromId(dynamic id) {
+    final hex = id?.toString() ?? '';
+    if (hex.length < 8) return null;
+    final seconds = int.tryParse(hex.substring(0, 8), radix: 16);
+    if (seconds == null) return null;
+    return DateTime.fromMillisecondsSinceEpoch(seconds * 1000, isUtc: true);
   }
 
   // Shows whether the selected day is the check-in night or a later night of

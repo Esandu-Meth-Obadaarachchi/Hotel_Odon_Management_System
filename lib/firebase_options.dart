@@ -21,10 +21,13 @@ class DefaultFirebaseOptions {
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for android - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        if (!androidConfigured) {
+          throw UnsupportedError(
+            'DefaultFirebaseOptions have not been configured for android - '
+            'fill in DefaultFirebaseOptions.android below.',
+          );
+        }
+        return android;
       case TargetPlatform.iOS:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for ios - '
@@ -60,4 +63,35 @@ class DefaultFirebaseOptions {
     authDomain: 'odon-dashboard-fin.firebaseapp.com',
     storageBucket: 'odon-dashboard-fin.firebasestorage.app',
   );
+
+  /// The Android app registered in the SAME Firebase project as the web app
+  /// (odon-dashboard-fin), package com.example.odon_booking. The backend only
+  /// accepts sign-ins from that project.
+  ///
+  /// Copy apiKey and appId from that app's google-services.json:
+  ///   apiKey -> client[0].api_key[0].current_key
+  ///   appId  -> client[0].client_info.mobilesdk_app_id
+  ///
+  /// If these are ever emptied the Android app runs without sign-in, and its
+  /// bookings are saved without a name.
+  static const FirebaseOptions android = FirebaseOptions(
+    apiKey: 'AIzaSyAAVF6lTXH_uZnIYpjqkFDBpdoulmge34Y',
+    appId: '1:54906570613:android:931e7ed941c279a8d6b53c',
+    messagingSenderId: '54906570613',
+    projectId: 'odon-dashboard-fin',
+    storageBucket: 'odon-dashboard-fin.firebasestorage.app',
+  );
+
+  static bool get androidConfigured =>
+      android.apiKey.isNotEmpty && android.appId.isNotEmpty;
+
+  /// Options for the platform the app is running on, or null where sign-in is
+  /// not set up (iOS/desktop, or Android before the values above are filled).
+  static FirebaseOptions? get signInPlatform {
+    if (kIsWeb) return web;
+    if (defaultTargetPlatform == TargetPlatform.android && androidConfigured) {
+      return android;
+    }
+    return null;
+  }
 }
