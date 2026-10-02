@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:odon_booking/core/api/api_service.dart';
 import 'package:odon_booking/features/guests/widgets/guest_name_autocomplete.dart';
 import 'widgets/room_picker.dart';
@@ -67,6 +68,13 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
       if (hasExtraBed((r['roomType'] ?? '').toString())) _extraBedRooms.add(roomNum);
     }
     _initialRooms = initialRooms;
+
+    // Stored as UTC midnight, so the UTC calendar day is the booked day.
+    final ci = DateTime.tryParse(b['checkIn']?.toString() ?? '') ?? widget.selectedDay;
+    final co = DateTime.tryParse(b['checkOut']?.toString() ?? '') ??
+        ci.add(const Duration(days: 1));
+    _checkIn = DateTime(ci.year, ci.month, ci.day);
+    _checkOut = DateTime(co.year, co.month, co.day);
     packageTypeController = TextEditingController(text: b['package'] as String? ?? '');
     extraDetailsController = TextEditingController(text: b['extraDetails'] as String? ?? '');
     totalController = TextEditingController(text: b['total'] as String? ?? '');
@@ -102,8 +110,10 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
 
   late final List<Map<String, dynamic>> _initialRooms;
 
-  DateTime get _checkIn => DateTime.parse(widget.booking['checkIn'].toString());
-  DateTime get _checkOut => DateTime.parse(widget.booking['checkOut'].toString());
+  late DateTime _checkIn;
+  late DateTime _checkOut;
+
+  int get _numOfNights => _checkOut.difference(_checkIn).inDays;
 
   Future<void> _loadRooms() async {
     try {
@@ -150,6 +160,87 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
       // The grid still works without it; save re-checks availability anyway.
     }
   }
+
+  Future<void> _pickDate({required bool isCheckIn}) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: isCheckIn ? _checkIn : _checkOut,
+      firstDate: isCheckIn ? DateTime(2020) : _checkIn.add(const Duration(days: 1)),
+      lastDate: DateTime(2030, 12, 31),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.light(primary: Colors.indigo, onPrimary: Colors.white),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked == null) return;
+
+    setState(() {
+      if (isCheckIn) {
+        // Keep the stay length when only the arrival moves.
+        final nights = _numOfNights > 0 ? _numOfNights : 1;
+        _checkIn = picked;
+        _checkOut = picked.add(Duration(days: nights));
+      } else {
+        _checkOut = picked;
+      }
+    });
+    await _checkRoomsStillFree();
+  }
+
+  /// Re-reads what other bookings hold on the current dates and drops any
+  /// selected room that is now taken. Returns false when rooms were dropped
+  /// or availability could not be checked.
+  Future<bool> _checkRoomsStillFree() async {
+    final Set<String> booked;
+    try {
+      booked = await _fetchBookedRooms(_checkIn, _checkOut);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not check room availability: $e')),
+        );
+      }
+      return false;
+    }
+    if (!mounted) return false;
+
+    final clashing = _selectedRooms.intersection(booked);
+    setState(() {
+      _bookedRooms = booked;
+      _selectedRooms.removeAll(clashing);
+      _extraBedRooms.removeAll(clashing);
+      for (final r in clashing) {
+        _unlistedRooms.remove(r);
+      }
+    });
+    if (clashing.isEmpty) return true;
+
+    final names = clashing.map((r) => r.padLeft(3, '0')).join(', ');
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Rooms not available'),
+        content: Text(
+          'Room${clashing.length > 1 ? 's' : ''} $names '
+          '${clashing.length > 1 ? 'are' : 'is'} already booked between '
+          '${_fmt(_checkIn)} and ${_fmt(_checkOut)}.\n\n'
+          '${clashing.length > 1 ? 'They have' : 'It has'} been removed from this booking. '
+          'Please pick replacement rooms before saving.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Reselect rooms'),
+          ),
+        ],
+      ),
+    );
+    return false;
+  }
+
+  String _fmt(DateTime d) => DateFormat('d MMM yyyy').format(d);
 
   /// Rooms as they will be saved: one entry per selected room, typed from the
   /// room config plus the extra-bed toggle.
@@ -210,13 +301,22 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
       );
       return;
     }
+    if (!_checkOut.isAfter(_checkIn)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Check-out must be after check-in')),
+      );
+      return;
+    }
+    // Someone may have booked one of these rooms since the screen opened.
+    if (!await _checkRoomsStillFree()) return;
+    if (!mounted) return;
 
     final updatedBooking = {
-      'num_of_nights': widget.booking['num_of_nights'],
+      'num_of_nights': _numOfNights,
       'package': packageTypeController.text,
       'extraDetails': extraDetailsController.text,
-      'checkIn': widget.booking['checkIn'],
-      'checkOut': widget.booking['checkOut'],
+      'checkIn': DateTime.utc(_checkIn.year, _checkIn.month, _checkIn.day).toIso8601String(),
+      'checkOut': DateTime.utc(_checkOut.year, _checkOut.month, _checkOut.day).toIso8601String(),
       'total': totalController.text,
       'advance': advanceController.text,
       'balanceMethod': _balanceMethod.isEmpty ? null : _balanceMethod,
@@ -301,6 +401,25 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
             ),
             const SizedBox(height: 15),
             _buildField('Guest Phone', guestPhoneController, icon: Icons.phone),
+            const SizedBox(height: 15),
+
+            // Stay dates — changing them re-checks the selected rooms
+            const Text('Stay Dates', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.indigo)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: _dateTile('Check-In', _checkIn, () => _pickDate(isCheckIn: true))),
+                const SizedBox(width: 10),
+                Icon(Icons.arrow_forward_rounded, size: 16, color: Colors.grey.shade400),
+                const SizedBox(width: 10),
+                Expanded(child: _dateTile('Check-Out', _checkOut, () => _pickDate(isCheckIn: false))),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '$_numOfNights night${_numOfNights == 1 ? '' : 's'}',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.indigo.shade700),
+            ),
             const SizedBox(height: 15),
 
             // Rooms — same grid as Add Booking
@@ -453,6 +572,42 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
                   ),
                 ],
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _dateTile(String label, DateTime date, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.indigo.shade50,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.indigo.shade200),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label,
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.indigo.shade500)),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Icon(Icons.calendar_today_outlined, size: 14, color: Colors.indigo.shade600),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    _fmt(date),
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.indigo.shade800),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
