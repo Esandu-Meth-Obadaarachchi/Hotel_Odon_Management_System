@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:odon_booking/core/api/api_service.dart';
 import 'package:odon_booking/core/utils/file_saver.dart' as file_saver;
+import 'package:odon_booking/features/bookings/widgets/extra_charges.dart';
 import 'invoice.dart' as invoice;
 
 /// Maps the booking system's package names to the price-config / invoice
@@ -173,13 +174,21 @@ Future<void> shareBookingInvoice(
             (booking['advance'] as String? ?? '').replaceAll(',', '').trim()) ??
         0.0;
 
+    // Charges recorded on the booking are listed by name; whatever is left
+    // between that and the stored total shows as a discount or adjustment.
     double discount = 0;
-    final List<invoice.ExtraCharge> extras = [];
-    if (rawSubtotal > finalTotal) {
-      discount = rawSubtotal - finalTotal;
-    } else if (finalTotal > rawSubtotal) {
+    final List<invoice.ExtraCharge> extras = extraChargesOf(booking)
+        .map((c) => invoice.ExtraCharge(
+              reason: (c['reason'] as String).isEmpty ? 'Extra charge' : c['reason'] as String,
+              amount: (c['amount'] as num).toDouble(),
+            ))
+        .toList();
+    final expected = rawSubtotal + extras.fold(0.0, (s, c) => s + c.amount);
+    if (expected > finalTotal) {
+      discount = expected - finalTotal;
+    } else if (finalTotal > expected) {
       extras.add(invoice.ExtraCharge(
-          reason: 'Adjustment', amount: finalTotal - rawSubtotal));
+          reason: 'Adjustment', amount: finalTotal - expected));
     }
     final balance = finalTotal - advance;
 

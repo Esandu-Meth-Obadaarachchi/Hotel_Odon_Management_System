@@ -201,12 +201,26 @@ const bookingSchema = new mongoose.Schema({
   guestPhone: String,
   mealStart: String,  // 'Lunch' or 'Dinner' — first meal on arrival day for FB/HB
   needDriver: { type: Boolean, default: false },
+  needKiriPidu: { type: Boolean, default: false },
+  // Arriving before the 2 PM check-in / leaving after the 11 AM check-out.
+  // The times are "HH:mm" and optional: staff often know only that it is early.
+  earlyCheckIn: { type: Boolean, default: false },
+  earlyCheckInTime: String,
+  lateCheckOut: { type: Boolean, default: false },
+  lateCheckOutTime: String,
   // Head count. The rooms already imply a capacity (Double = 2, Family = 4 …)
   // and that is what numAdults defaults to, but the front desk can correct it.
   // Kids are recorded separately because they are never counted when picking a
   // room — tracking them is the only way to notice a "kid" who arrives adult.
   numAdults: Number,
   numKids: Number,
+  // Itemised extras (late check-out fee, extra dinner …). The booking's total
+  // already includes them; this keeps the reason next to each amount.
+  extraCharges: [{
+    _id: false,
+    reason: String,
+    amount: Number,
+  }],
   ...auditFields,     // createdBy / updatedBy — stamped from the verified token
 });
 
@@ -246,6 +260,35 @@ function headCount(body) {
   return {
     numAdults: Number.isFinite(adults) && adults >= 0 ? adults : roomCapacity(body),
     numKids: Number.isFinite(kids) && kids >= 0 ? kids : 0,
+  };
+}
+
+// Cleans the extra charges sent by the app: drops blank rows and anything
+// that is not a number. Returns undefined when the field was not sent, so an
+// older client editing a booking leaves the stored charges alone.
+function cleanExtraCharges(list) {
+  if (!Array.isArray(list)) return undefined;
+  return list
+    .map((c) => ({
+      reason: String((c && c.reason) ?? '').trim(),
+      amount: Number(c && c.amount),
+    }))
+    .filter((c) => c.reason || (Number.isFinite(c.amount) && c.amount !== 0))
+    .map((c) => ({ reason: c.reason, amount: Number.isFinite(c.amount) ? c.amount : 0 }));
+}
+
+// Early check-in / late check-out fields. A time is kept only while its
+// toggle is on and only in "HH:mm" form; anything else is stored as null.
+function stayTimes(body) {
+  const clean = (on, t) =>
+    on && typeof t === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(t) ? t : null;
+  const early = body.earlyCheckIn === true;
+  const late = body.lateCheckOut === true;
+  return {
+    earlyCheckIn: early,
+    earlyCheckInTime: clean(early, body.earlyCheckInTime),
+    lateCheckOut: late,
+    lateCheckOutTime: clean(late, body.lateCheckOutTime),
   };
 }
 
@@ -395,7 +438,10 @@ app.post('/bookings', requireUser, async (req, res) => {
     guestPhone: req.body.guestPhone,
     mealStart: req.body.mealStart,
     needDriver: req.body.needDriver ?? false,
+    needKiriPidu: req.body.needKiriPidu ?? false,
+    ...stayTimes(req.body),
     ...headCount(req.body),
+    extraCharges: cleanExtraCharges(req.body.extraCharges) ?? [],
   });
 
   try {
@@ -437,7 +483,12 @@ app.put('/bookings/:id', requireUser, async (req, res) => {
       guestPhone: req.body.guestPhone,
       mealStart: req.body.mealStart,
       needDriver: req.body.needDriver ?? false,
+      needKiriPidu: req.body.needKiriPidu ?? false,
+      ...stayTimes(req.body),
       ...headCount(req.body),
+      ...(Array.isArray(req.body.extraCharges) && {
+        extraCharges: cleanExtraCharges(req.body.extraCharges),
+      }),
       // Records who last touched it; createdBy is deliberately left alone.
       ...updateStamp(req),
     };

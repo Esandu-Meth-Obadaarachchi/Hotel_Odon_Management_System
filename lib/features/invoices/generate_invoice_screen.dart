@@ -7,6 +7,7 @@ import 'package:odon_booking/core/api/api_service.dart';
 import 'package:odon_booking/core/utils/file_saver.dart' as file_saver;
 import 'package:odon_booking/features/financials/price_settings_screen.dart';
 import 'package:odon_booking/features/bookings/room_selection_screen.dart';
+import 'package:odon_booking/features/bookings/widgets/booking_flags.dart';
 
 class Room {
   String type;
@@ -54,6 +55,13 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
   double _additionalDiscount = 0.0;
   double _discountPerRoom = 1000.0;
   bool _includeDriverRoom = false;
+
+  // Not priced on the invoice; carried into the booking when it is added.
+  bool _needKiriPidu = false;
+  bool _earlyCheckIn = false;
+  String? _earlyCheckInTime; // "HH:mm", optional
+  bool _lateCheckOut = false;
+  String? _lateCheckOutTime; // "HH:mm", optional
   double _driverRoomPrice = 2500.0;
 
   List<ExtraCharge> _extraCharges = [];
@@ -690,6 +698,54 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                               _calculateTotal();
                             }),
                           ),
+                          const SizedBox(height: 8),
+                          _toggleRow(
+                            icon: Icons.rice_bowl_rounded,
+                            iconColor: Colors.teal.shade700,
+                            iconBg: Colors.teal.shade50,
+                            title: 'Need Kiri Pidu',
+                            subtitle: 'Prepare kiri pidu for this booking',
+                            value: _needKiriPidu,
+                            onChanged: (v) => setState(() => _needKiriPidu = v),
+                          ),
+                          const SizedBox(height: 8),
+                          _toggleRow(
+                            icon: Icons.schedule_rounded,
+                            iconColor: Colors.green.shade700,
+                            iconBg: Colors.green.shade50,
+                            title: 'Early Check-in',
+                            subtitle: 'Arriving before 2:00 PM',
+                            value: _earlyCheckIn,
+                            onChanged: (v) => setState(() => _earlyCheckIn = v),
+                          ),
+                          if (_earlyCheckIn)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(12, 4, 0, 0),
+                              child: OptionalTimeField(
+                                value: _earlyCheckInTime,
+                                hint: 'Arrival time (optional)',
+                                onChanged: (t) => setState(() => _earlyCheckInTime = t),
+                              ),
+                            ),
+                          const SizedBox(height: 8),
+                          _toggleRow(
+                            icon: Icons.more_time_rounded,
+                            iconColor: Colors.deepOrange.shade700,
+                            iconBg: Colors.deepOrange.shade50,
+                            title: 'Late Check-out',
+                            subtitle: 'Leaving after 11:00 AM',
+                            value: _lateCheckOut,
+                            onChanged: (v) => setState(() => _lateCheckOut = v),
+                          ),
+                          if (_lateCheckOut)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(12, 4, 0, 0),
+                              child: OptionalTimeField(
+                                value: _lateCheckOutTime,
+                                hint: 'Departure time (optional)',
+                                onChanged: (t) => setState(() => _lateCheckOutTime = t),
+                              ),
+                            ),
                           const SizedBox(height: 8),
                           // Day customization toggle
                           _toggleRow(
@@ -1547,9 +1603,19 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
       'total': _totalAmount.toStringAsFixed(2),
       'advance': _advanceAmount.toStringAsFixed(2),
       'needDriver': _includeDriverRoom,
+      'needKiriPidu': _needKiriPidu,
+      'earlyCheckIn': _earlyCheckIn,
+      'earlyCheckInTime': _earlyCheckIn ? _earlyCheckInTime : null,
+      'lateCheckOut': _lateCheckOut,
+      'lateCheckOutTime': _lateCheckOut ? _lateCheckOutTime : null,
       'extraDetails': _specialNotesController.text,
       'numAdults': _adultsEntered,
       'numKids': _kidsEntered,
+      // Already counted in the total above; the booking keeps the breakdown.
+      'extraCharges': _extraCharges
+          .where((c) => c.reason.trim().isNotEmpty || c.amount != 0)
+          .map((c) => {'reason': c.reason.trim(), 'amount': c.amount})
+          .toList(),
     };
   }
 

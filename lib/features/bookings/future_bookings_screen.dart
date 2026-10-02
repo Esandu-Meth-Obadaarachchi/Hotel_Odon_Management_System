@@ -3,6 +3,8 @@ import 'package:intl/intl.dart';
 import 'package:odon_booking/core/api/api_service.dart';
 import 'package:odon_booking/features/bookings/head_count.dart';
 import 'edit_booking_screen.dart';
+import 'package:odon_booking/features/bookings/widgets/booking_flags.dart';
+import 'package:odon_booking/features/bookings/widgets/extra_charges.dart';
 
 class FutureBookingsScreen extends StatefulWidget {
   @override
@@ -211,6 +213,7 @@ class _FutureBookingsScreenState extends State<FutureBookingsScreen> {
     final guestPhone = booking['guestPhone'] as String? ?? '';
     final package = booking['package'] as String? ?? 'N/A';
     final extraDetails = (booking['extraDetails'] as String?)?.trim() ?? '';
+    final extraCharges = extraChargesOf(booking);
     final numOfNights = booking['num_of_nights']?.toString() ?? 'N/A';
     final total = booking['total'] as String? ?? '';
     final advance = booking['advance'] as String? ?? '';
@@ -384,6 +387,8 @@ class _FutureBookingsScreenState extends State<FutureBookingsScreen> {
                   ]),
                 ],
 
+                BookingFlagBadges(booking: booking),
+
                 if (needDriver) ...[
                   const SizedBox(height: 8),
                   Container(
@@ -466,6 +471,11 @@ class _FutureBookingsScreenState extends State<FutureBookingsScreen> {
                                 'Advance', 'LKR $advance', Colors.orange)),
                     ],
                   ),
+                ],
+
+                if (extraCharges.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  ExtraChargesSummary(charges: extraCharges),
                 ],
 
                 if (extraDetails.isNotEmpty) ...[

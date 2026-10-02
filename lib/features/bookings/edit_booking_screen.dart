@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:odon_booking/core/api/api_service.dart';
 import 'package:odon_booking/features/guests/widgets/guest_name_autocomplete.dart';
+import 'widgets/booking_flags.dart';
+import 'widgets/extra_charges.dart';
+import 'widgets/room_picker.dart';
 
 class EditBookingScreen extends StatefulWidget {
   final Map<String, dynamic> booking;
@@ -24,20 +28,30 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
   late TextEditingController adultsController;
   late TextEditingController kidsController;
 
-  // Legacy fields (old single-room bookings)
-  late TextEditingController roomNumberController;
-  late TextEditingController roomTypeController;
+  // Room selection, picked on the same grid as Add Booking. Legacy
+  // single-room bookings load into it too and are saved back in the
+  // multi-room format.
+  List<Map<String, dynamic>> _roomConfig = [];
+  bool _configLoading = true;
+  final Set<String> _selectedRooms = {};
+  final Set<String> _extraBedRooms = {};
+  Set<String> _bookedRooms = {};
 
-  // New: per-room list (new multi-room bookings)
-  late List<Map<String, dynamic>> _rooms;
-  late bool _isNewFormat;
+  /// Rooms on the booking that are missing from the room config (renamed or
+  /// removed since). They are kept as they were so an edit never drops them.
+  final Map<String, Map<String, dynamic>> _unlistedRooms = {};
 
   String _balanceMethod = '';
   String _balanceDisplay = 'N/A';
   String? _mealStart;
   bool _needDriver = false;
+  bool _needKiriPidu = false;
+  bool _earlyCheckIn = false;
+  String? _earlyCheckInTime; // "HH:mm", optional
+  bool _lateCheckOut = false;
+  String? _lateCheckOutTime; // "HH:mm", optional
+  List<Map<String, dynamic>> _extraCharges = [];
 
-  static const _roomTypes = ['Double', 'Triple', 'Family', 'Family Plus'];
   static const _packages = ['Full Board', 'Half Board', 'Room Only', 'BnB', 'Dinner Only'];
   static const _mealStarts = ['Lunch', 'Dinner'];
 
@@ -46,15 +60,29 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
     super.initState();
     final b = widget.booking;
 
-    _isNewFormat = b['rooms'] != null && (b['rooms'] as List).isNotEmpty;
-    _rooms = _isNewFormat
-        ? List<Map<String, dynamic>>.from(
-            (b['rooms'] as List).map((r) => Map<String, dynamic>.from(r)),
-          )
-        : [];
+    final isNewFormat = b['rooms'] is List && (b['rooms'] as List).isNotEmpty;
+    final List<Map<String, dynamic>> initialRooms = isNewFormat
+        ? (b['rooms'] as List).map((r) => Map<String, dynamic>.from(r)).toList()
+        : [
+            if ((b['roomNumber'] ?? '').toString().trim().isNotEmpty)
+              {
+                'roomNumber': b['roomNumber'].toString().trim(),
+                'roomType': b['roomType'] ?? 'Double',
+              },
+          ];
+    for (final r in initialRooms) {
+      final roomNum = r['roomNumber'].toString();
+      _selectedRooms.add(roomNum);
+      if (hasExtraBed((r['roomType'] ?? '').toString())) _extraBedRooms.add(roomNum);
+    }
+    _initialRooms = initialRooms;
 
-    roomNumberController = TextEditingController(text: b['roomNumber'] as String? ?? '');
-    roomTypeController = TextEditingController(text: b['roomType'] as String? ?? '');
+    // Stored as UTC midnight, so the UTC calendar day is the booked day.
+    final ci = DateTime.tryParse(b['checkIn']?.toString() ?? '') ?? widget.selectedDay;
+    final co = DateTime.tryParse(b['checkOut']?.toString() ?? '') ??
+        ci.add(const Duration(days: 1));
+    _checkIn = DateTime(ci.year, ci.month, ci.day);
+    _checkOut = DateTime(co.year, co.month, co.day);
     packageTypeController = TextEditingController(text: b['package'] as String? ?? '');
     extraDetailsController = TextEditingController(text: b['extraDetails'] as String? ?? '');
     totalController = TextEditingController(text: b['total'] as String? ?? '');
@@ -80,10 +108,177 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
     final savedMealStart = b['mealStart'] as String?;
     _mealStart = (savedMealStart == 'Lunch' || savedMealStart == 'Dinner') ? savedMealStart : null;
     _needDriver = b['needDriver'] == true;
+    _needKiriPidu = b['needKiriPidu'] == true;
+    _earlyCheckIn = b['earlyCheckIn'] == true;
+    _earlyCheckInTime = parseStayTime(b['earlyCheckInTime']) != null ? b['earlyCheckInTime'].toString() : null;
+    _lateCheckOut = b['lateCheckOut'] == true;
+    _lateCheckOutTime = parseStayTime(b['lateCheckOutTime']) != null ? b['lateCheckOutTime'].toString() : null;
+    _extraCharges = extraChargesOf(b);
 
     totalController.addListener(_recalcBalance);
     advanceController.addListener(_recalcBalance);
     _recalcBalance();
+
+    _loadRooms();
+  }
+
+  late final List<Map<String, dynamic>> _initialRooms;
+
+  late DateTime _checkIn;
+  late DateTime _checkOut;
+
+  int get _numOfNights => _checkOut.difference(_checkIn).inDays;
+
+  Future<void> _loadRooms() async {
+    try {
+      final config = await _apiService.fetchRoomConfig();
+      final rooms = List<Map<String, dynamic>>.from(
+        (config['rooms'] as List).map((r) => Map<String, dynamic>.from(r)),
+      );
+      final known = rooms.map((r) => r['roomNumber'].toString()).toSet();
+      setState(() {
+        _roomConfig = rooms;
+        for (final r in _initialRooms) {
+          final roomNum = r['roomNumber'].toString();
+          if (!known.contains(roomNum)) _unlistedRooms[roomNum] = r;
+        }
+        _configLoading = false;
+      });
+    } catch (e) {
+      setState(() => _configLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load room config: $e')),
+        );
+      }
+    }
+    await _refreshBookedRooms();
+  }
+
+  /// Rooms other bookings hold on this booking's dates.
+  Future<Set<String>> _fetchBookedRooms(DateTime checkIn, DateTime checkOut) async {
+    final bookings = await _apiService.fetchBookingsForDateRange(checkIn, checkOut);
+    return bookedRoomsBetween(
+      bookings,
+      checkIn,
+      checkOut,
+      excludeId: widget.booking['_id'] as String?,
+    );
+  }
+
+  Future<void> _refreshBookedRooms() async {
+    try {
+      final booked = await _fetchBookedRooms(_checkIn, _checkOut);
+      if (mounted) setState(() => _bookedRooms = booked);
+    } catch (_) {
+      // The grid still works without it; save re-checks availability anyway.
+    }
+  }
+
+  Future<void> _pickDate({required bool isCheckIn}) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: isCheckIn ? _checkIn : _checkOut,
+      firstDate: isCheckIn ? DateTime(2020) : _checkIn.add(const Duration(days: 1)),
+      lastDate: DateTime(2030, 12, 31),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.light(primary: Colors.indigo, onPrimary: Colors.white),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked == null) return;
+
+    setState(() {
+      if (isCheckIn) {
+        // Keep the stay length when only the arrival moves.
+        final nights = _numOfNights > 0 ? _numOfNights : 1;
+        _checkIn = picked;
+        _checkOut = picked.add(Duration(days: nights));
+      } else {
+        _checkOut = picked;
+      }
+    });
+    await _checkRoomsStillFree();
+  }
+
+  /// Re-reads what other bookings hold on the current dates and drops any
+  /// selected room that is now taken. Returns false when rooms were dropped
+  /// or availability could not be checked.
+  Future<bool> _checkRoomsStillFree() async {
+    final Set<String> booked;
+    try {
+      booked = await _fetchBookedRooms(_checkIn, _checkOut);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not check room availability: $e')),
+        );
+      }
+      return false;
+    }
+    if (!mounted) return false;
+
+    final clashing = _selectedRooms.intersection(booked);
+    setState(() {
+      _bookedRooms = booked;
+      _selectedRooms.removeAll(clashing);
+      _extraBedRooms.removeAll(clashing);
+      for (final r in clashing) {
+        _unlistedRooms.remove(r);
+      }
+    });
+    if (clashing.isEmpty) return true;
+
+    final names = clashing.map((r) => r.padLeft(3, '0')).join(', ');
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Rooms not available'),
+        content: Text(
+          'Room${clashing.length > 1 ? 's' : ''} $names '
+          '${clashing.length > 1 ? 'are' : 'is'} already booked between '
+          '${_fmt(_checkIn)} and ${_fmt(_checkOut)}.\n\n'
+          '${clashing.length > 1 ? 'They have' : 'It has'} been removed from this booking. '
+          'Please pick replacement rooms before saving.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Reselect rooms'),
+          ),
+        ],
+      ),
+    );
+    return false;
+  }
+
+  String _fmt(DateTime d) => DateFormat('d MMM yyyy').format(d);
+
+  /// Rooms as they will be saved: one entry per selected room, typed from the
+  /// room config plus the extra-bed toggle.
+  List<Map<String, dynamic>> get _roomsData {
+    final list = <Map<String, dynamic>>[];
+    for (final roomNum in _selectedRooms) {
+      final cfg = _roomConfig.firstWhere(
+        (r) => r['roomNumber'].toString() == roomNum,
+        orElse: () => <String, dynamic>{},
+      );
+      if (cfg.isEmpty) {
+        final kept = _unlistedRooms[roomNum] ??
+            _initialRooms.firstWhere(
+              (r) => r['roomNumber'].toString() == roomNum,
+              orElse: () => {'roomNumber': roomNum, 'roomType': 'Double'},
+            );
+        final type = (kept['roomType'] ?? 'Double').toString();
+        list.add({'roomNumber': roomNum, 'roomType': type, 'pax': paxForType(type)});
+        continue;
+      }
+      final type = effectiveRoomType(cfg, extraBed: _extraBedRooms.contains(roomNum));
+      list.add({'roomNumber': roomNum, 'roomType': type, 'pax': paxForType(type)});
+    }
+    return list;
   }
 
   @override
@@ -96,8 +291,6 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
     extraDetailsController.dispose();
     guestNameController.dispose();
     guestPhoneController.dispose();
-    roomNumberController.dispose();
-    roomTypeController.dispose();
     adultsController.dispose();
     kidsController.dispose();
     super.dispose();
@@ -110,46 +303,56 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
   }
 
   Future<void> _save() async {
-    if (_isNewFormat) {
-      if (packageTypeController.text.trim().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please fill in all required fields')),
-        );
-        return;
-      }
-    } else {
-      if (roomNumberController.text.isEmpty ||
-          roomTypeController.text.isEmpty ||
-          packageTypeController.text.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please fill in all required fields')),
-        );
-        return;
-      }
+    if (packageTypeController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill in all required fields')),
+      );
+      return;
     }
+    if (_selectedRooms.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select at least one room')),
+      );
+      return;
+    }
+    if (!_checkOut.isAfter(_checkIn)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Check-out must be after check-in')),
+      );
+      return;
+    }
+    // Someone may have booked one of these rooms since the screen opened.
+    if (!await _checkRoomsStillFree()) return;
+    if (!mounted) return;
 
     final updatedBooking = {
-      'num_of_nights': widget.booking['num_of_nights'],
+      'num_of_nights': _numOfNights,
       'package': packageTypeController.text,
       'extraDetails': extraDetailsController.text,
-      'checkIn': widget.booking['checkIn'],
-      'checkOut': widget.booking['checkOut'],
+      'checkIn': DateTime.utc(_checkIn.year, _checkIn.month, _checkIn.day).toIso8601String(),
+      'checkOut': DateTime.utc(_checkOut.year, _checkOut.month, _checkOut.day).toIso8601String(),
       'total': totalController.text,
       'advance': advanceController.text,
       'balanceMethod': _balanceMethod.isEmpty ? null : _balanceMethod,
       'guestName': guestNameController.text,
       'guestPhone': guestPhoneController.text,
       'needDriver': _needDriver,
+      'needKiriPidu': _needKiriPidu,
+      'earlyCheckIn': _earlyCheckIn,
+      'earlyCheckInTime': _earlyCheckIn ? _earlyCheckInTime : null,
+      'lateCheckOut': _lateCheckOut,
+      'lateCheckOutTime': _lateCheckOut ? _lateCheckOutTime : null,
       // Always sent: the PUT replaces the whole document, so omitting these
       // would wipe the head count off any booking that gets edited.
       'numAdults': int.tryParse(adultsController.text.trim()) ?? _roomCapacity,
       'numKids': int.tryParse(kidsController.text.trim()) ?? 0,
       if (_mealStart != null) 'mealStart': _mealStart,
-      // Legacy fields
-      if (!_isNewFormat) 'roomNumber': roomNumberController.text,
-      if (!_isNewFormat) 'roomType': roomTypeController.text,
-      // New fields
-      if (_isNewFormat) 'rooms': _rooms,
+      'rooms': _roomsData,
+      'extraCharges': _extraCharges,
+      // Clears the old single-room fields so a converted legacy booking is
+      // read in the multi-room format everywhere.
+      'roomNumber': null,
+      'roomType': null,
     };
 
     try {
@@ -220,18 +423,54 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
             _buildField('Guest Phone', guestPhoneController, icon: Icons.phone),
             const SizedBox(height: 15),
 
-            // Rooms section — new format shows per-room type editors, legacy shows text fields
-            if (_isNewFormat) ...[
-              const Text('Rooms', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.indigo)),
-              const SizedBox(height: 8),
-              ..._rooms.asMap().entries.map((entry) => _buildRoomRow(entry.key, entry.value)),
-              const SizedBox(height: 15),
-            ] else ...[
-              _buildField('Room Number', roomNumberController, icon: Icons.hotel),
-              const SizedBox(height: 15),
-              _buildField('Room Type', roomTypeController, icon: Icons.room_preferences),
-              const SizedBox(height: 15),
-            ],
+            // Stay dates — changing them re-checks the selected rooms
+            const Text('Stay Dates', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.indigo)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: _dateTile('Check-In', _checkIn, () => _pickDate(isCheckIn: true))),
+                const SizedBox(width: 10),
+                Icon(Icons.arrow_forward_rounded, size: 16, color: Colors.grey.shade400),
+                const SizedBox(width: 10),
+                Expanded(child: _dateTile('Check-Out', _checkOut, () => _pickDate(isCheckIn: false))),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '$_numOfNights night${_numOfNights == 1 ? '' : 's'}',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.indigo.shade700),
+            ),
+            const SizedBox(height: 15),
+
+            // Rooms — same grid as Add Booking
+            const Text('Rooms', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.indigo)),
+            const SizedBox(height: 8),
+            if (_configLoading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(child: CircularProgressIndicator(color: Colors.indigo)),
+              )
+            else
+              RoomPicker(
+                roomConfig: _roomConfig,
+                selectedRooms: _selectedRooms,
+                extraBedRooms: _extraBedRooms,
+                bookedRooms: _bookedRooms,
+                onToggleRoom: (roomNum) => setState(() {
+                  if (!_selectedRooms.remove(roomNum)) {
+                    _selectedRooms.add(roomNum);
+                  } else {
+                    _extraBedRooms.remove(roomNum);
+                    _unlistedRooms.remove(roomNum);
+                  }
+                }),
+                onToggleExtraBed: (roomNum) => setState(() {
+                  if (!_extraBedRooms.remove(roomNum)) _extraBedRooms.add(roomNum);
+                }),
+              ),
+            const SizedBox(height: 10),
+            _buildSelectedRoomsSummary(),
+            const SizedBox(height: 15),
 
             // Head count — adults defaults to the rooms' capacity, kids are
             // recorded by hand because they never affect the room chosen.
@@ -277,6 +516,23 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
 
             _buildField('Extra Details', extraDetailsController, icon: Icons.notes, maxLines: 3),
             const SizedBox(height: 20),
+            const Text('Extra Charges', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.indigo)),
+            const SizedBox(height: 4),
+            Text('Changes here update the Total Cost below.',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+            const SizedBox(height: 10),
+            ExtraChargesEditor(
+              initialCharges: _extraCharges,
+              onChanged: (charges) => setState(() {
+                totalController.text = adjustTotalForCharges(
+                  totalController.text,
+                  sumExtraCharges(_extraCharges),
+                  sumExtraCharges(charges),
+                );
+                _extraCharges = charges;
+              }),
+            ),
+            const SizedBox(height: 15),
             _buildField('Total Cost', totalController, icon: Icons.monetization_on),
             const SizedBox(height: 20),
             _buildField('Advance', advanceController, icon: Icons.attach_money),
@@ -324,6 +580,63 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
                 const Text('Requires Driver Room', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
               ],
             ),
+            Row(
+              children: [
+                Checkbox(
+                  value: _needKiriPidu,
+                  activeColor: Colors.indigo,
+                  onChanged: (v) => setState(() => _needKiriPidu = v ?? false),
+                ),
+                const SizedBox(width: 4),
+                const Icon(Icons.rice_bowl_rounded, size: 18, color: Colors.indigo),
+                const SizedBox(width: 8),
+                const Text('Need Kiri Pidu', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+              ],
+            ),
+            Row(
+              children: [
+                Checkbox(
+                  value: _earlyCheckIn,
+                  activeColor: Colors.indigo,
+                  onChanged: (v) => setState(() => _earlyCheckIn = v ?? false),
+                ),
+                const SizedBox(width: 4),
+                const Icon(Icons.schedule_rounded, size: 18, color: Colors.indigo),
+                const SizedBox(width: 8),
+                const Text('Early Check-in', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+              ],
+            ),
+            if (_earlyCheckIn)
+              Padding(
+                padding: const EdgeInsets.only(left: 48),
+                child: OptionalTimeField(
+                  value: _earlyCheckInTime,
+                  hint: 'Arrival time (optional)',
+                  onChanged: (t) => setState(() => _earlyCheckInTime = t),
+                ),
+              ),
+            Row(
+              children: [
+                Checkbox(
+                  value: _lateCheckOut,
+                  activeColor: Colors.indigo,
+                  onChanged: (v) => setState(() => _lateCheckOut = v ?? false),
+                ),
+                const SizedBox(width: 4),
+                const Icon(Icons.more_time_rounded, size: 18, color: Colors.indigo),
+                const SizedBox(width: 8),
+                const Text('Late Check-out', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+              ],
+            ),
+            if (_lateCheckOut)
+              Padding(
+                padding: const EdgeInsets.only(left: 48),
+                child: OptionalTimeField(
+                  value: _lateCheckOutTime,
+                  hint: 'Departure time (optional)',
+                  onChanged: (t) => setState(() => _lateCheckOutTime = t),
+                ),
+              ),
             const SizedBox(height: 30),
 
             Center(
@@ -360,52 +673,35 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
     );
   }
 
-  Widget _buildRoomRow(int index, Map<String, dynamic> room) {
-    final currentType = room['roomType'] as String? ?? 'Double';
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Row(
+  Widget _dateTile(String label, DateTime date, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.indigo.shade50,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.indigo.shade200),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                color: Colors.indigo.shade50,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Center(
-                child: Text(
-                  (room['roomNumber'] ?? '').toString().padLeft(3, '0'),
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.indigo),
+            Text(label,
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.indigo.shade500)),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Icon(Icons.calendar_today_outlined, size: 14, color: Colors.indigo.shade600),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    _fmt(date),
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.indigo.shade800),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: DropdownButtonFormField<String>(
-                value: _roomTypes.contains(currentType) ? currentType : null,
-                decoration: InputDecoration(
-                  labelText: 'Room Type',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                ),
-                items: _roomTypes.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
-                onChanged: (v) {
-                  if (v != null) {
-                    setState(() {
-                      _rooms[index]['roomType'] = v;
-                      _rooms[index]['pax'] = _paxForType(v);
-                    });
-                  }
-                },
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              '${_paxForType(currentType)}pax',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              ],
             ),
           ],
         ),
@@ -413,31 +709,62 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
     );
   }
 
-  int _paxForType(String type) {
-    switch (type) {
-      case 'Double': return 2;
-      case 'Triple': return 3;
-      case 'Family': return 4;
-      case 'Family Plus': return 5;
-      default: return 2;
+  Widget _buildSelectedRoomsSummary() {
+    final rooms = _roomsData;
+    if (rooms.isEmpty) {
+      return Text(
+        'No rooms selected. Tap a room to add it.',
+        style: TextStyle(fontSize: 12, color: Colors.red.shade400),
+      );
     }
+    final unlisted = rooms.where((r) => _unlistedRooms.containsKey(r['roomNumber'])).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          children: rooms.map((r) {
+            final isUnlisted = _unlistedRooms.containsKey(r['roomNumber']);
+            return InputChip(
+              label: Text(
+                'Room ${r['roomNumber'].toString().padLeft(3, '0')} · ${r['roomType']} · ${r['pax']}pax',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.green.shade800),
+              ),
+              backgroundColor: Colors.green.shade50,
+              side: BorderSide(color: Colors.green.shade300),
+              // Unlisted rooms are not on the grid, so this is the only way
+              // to drop them.
+              onDeleted: isUnlisted
+                  ? () => setState(() {
+                        _selectedRooms.remove(r['roomNumber']);
+                        _unlistedRooms.remove(r['roomNumber']);
+                      })
+                  : null,
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          unlisted.isEmpty
+              ? 'Tap + on a selected room to add an extra bed'
+              : 'Rooms not in the current room setup are kept as they were.',
+          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+        ),
+      ],
+    );
   }
 
   /// Combined capacity of this booking's rooms, across both the new per-room
   /// list and the legacy single-room fields. Used only as the fallback for a
   /// booking that predates the stored head count.
-  int get _roomCapacity {
-    if (_isNewFormat) {
-      return _rooms.fold<int>(0, (sum, r) {
+  int get _roomCapacity => _initialRooms.fold<int>(0, (sum, r) {
         final pax = r['pax'];
         return sum +
             (pax is num && pax > 0
                 ? pax.toInt()
-                : _paxForType((r['roomType'] ?? '').toString()));
+                : paxForType((r['roomType'] ?? '').toString()));
       });
-    }
-    return _paxForType(roomTypeController.text);
-  }
 
   Widget _buildField(String label, TextEditingController controller,
       {IconData? icon, int maxLines = 1, TextInputType? keyboardType}) {
