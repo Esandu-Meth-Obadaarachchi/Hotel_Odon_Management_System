@@ -321,8 +321,8 @@ The Generate Invoice screen has the same Kiri Pidu, Early Check-in and Late Chec
 ## Audit Trail ("Added by" / "edited by")
 
 - The backend stamps `createdBy` / `createdByName` / `updatedBy` / `updatedByName` / `createdAt` / `updatedAt` from the verified Firebase ID token (`createStamp` / `updateStamp` in `flutter_mongodb_backend/auth.js`). No token means no name, so the booking card shows no audit line.
-- Sign-in (and so attribution) needs Firebase initialised on that platform. Web always has it. Android has it once `DefaultFirebaseOptions.android` in `lib/firebase_options.dart` is filled in from an Android app registered in the **odon-dashboard-fin** project (with the signing SHA-1 added). While those values are empty the Android app opens straight to `HomeScreen` without sign-in, as before.
-- `android/app/google-services.json` belongs to an old project (`hotelbooking-507e1`) and is not used for sign-in.
+- Sign-in (and so attribution) needs Firebase initialised on that platform. Web always has it. Android has it through `DefaultFirebaseOptions.android` in `lib/firebase_options.dart` (the Android app registered in the **odon-dashboard-fin** project). An APK signed with a key whose SHA-1 is not registered there cannot sign in; add each build machine's SHA-1 in the Firebase console.
+- `android/app/google-services.json` is the odon-dashboard-fin Android app (debug-key SHA-1 registered). The Dart options above are what the app reads; the JSON is kept for reference since the Gradle google-services plugin is not applied.
 - The view card falls back to the ObjectId timestamp for `createdAt` on bookings saved before `createdAt` was stored.
 
 ## Performance Notes
