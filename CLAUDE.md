@@ -314,6 +314,8 @@ Phone-keyed guest directory. Guests are auto-populated from booking saves — th
 - **Kiri Pidu** (`needKiriPidu`): toggle like the driver room. Teal badge on booking cards.
 - **Early check-in / late check-out**: toggles with an optional `HH:mm` time (`OptionalTimeField`). Badges on booking cards, plus an "Early Arrivals & Late Departures" card on the home dashboard for the selected day. Backend `stayTimes()` validates the time and nulls it when the toggle is off.
 
+The Generate Invoice screen has the same Kiri Pidu, Early Check-in and Late Check-out toggles (not priced). "Add booking to system" passes them in the prefill, so the new booking starts with them set.
+
 `BookingFlagBadges` renders all three flag badges and is used on the view, full-day, past and upcoming booking cards.
 
 ## Packages

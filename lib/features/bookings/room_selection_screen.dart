@@ -10,7 +10,9 @@ class RoomSelectionScreen extends StatefulWidget {
   /// Optional prefill data (e.g. coming from the Generate Invoice screen).
   /// Recognised keys: guestName, guestPhone (String); checkIn, checkOut
   /// (DateTime); package, mealStart (String); total, advance, extraDetails
-  /// (String); needDriver (bool); numAdults, numKids (int).
+  /// (String); needDriver, needKiriPidu, earlyCheckIn, lateCheckOut (bool);
+  /// earlyCheckInTime, lateCheckOutTime ("HH:mm" String); numAdults, numKids
+  /// (int); extraCharges (List of {reason, amount}).
   final Map<String, dynamic>? prefill;
 
   RoomSelectionScreen({this.prefill});
@@ -87,6 +89,15 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
     }
 
     _needDriver = p['needDriver'] == true;
+    _needKiriPidu = p['needKiriPidu'] == true;
+    _earlyCheckIn = p['earlyCheckIn'] == true;
+    if (_earlyCheckIn && parseStayTime(p['earlyCheckInTime']) != null) {
+      _earlyCheckInTime = p['earlyCheckInTime'].toString();
+    }
+    _lateCheckOut = p['lateCheckOut'] == true;
+    if (_lateCheckOut && parseStayTime(p['lateCheckOutTime']) != null) {
+      _lateCheckOutTime = p['lateCheckOutTime'].toString();
+    }
 
     // The invoice total already includes these, so they carry over as-is.
     _extraCharges = extraChargesOf(p);
