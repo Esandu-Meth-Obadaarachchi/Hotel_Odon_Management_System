@@ -6,6 +6,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const cors = require('cors');
+const compression = require('compression');
 const {
   ENFORCE,
   PROJECT_ID,
@@ -21,6 +22,10 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // Middleware
+// Gzip every JSON response the client accepts it for. The bookings list is
+// ~500 KB and the home screen re-reads it every 30 s; compressed it is under
+// 100 KB. Browsers and Dart's HttpClient decompress it automatically.
+app.use(compression());
 app.use(cors());
 app.use(bodyParser.json());
 
