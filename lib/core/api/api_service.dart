@@ -39,10 +39,10 @@ class ApiService {
   // from the verified claims, so "who made this booking" cannot be spoofed by
   // a client.
   //
-  // Firebase is currently only initialised on web ([main.dart]), so on mobile
-  // there is no token yet and requests go out unauthenticated — the backend
-  // accepts those while AUTH_ENFORCE is off. Once mobile sign-in is added this
-  // starts returning tokens with no change needed here.
+  // Firebase is initialised on web, and on Android once its options are set
+  // ([firebase_options.dart]). Where it is not, there is no token and requests
+  // go out unauthenticated: the backend accepts those while AUTH_ENFORCE is
+  // off, but cannot say who made the booking.
 
   Future<String?> _idToken() async {
     try {

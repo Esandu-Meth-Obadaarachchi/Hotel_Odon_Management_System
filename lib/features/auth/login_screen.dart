@@ -1,9 +1,10 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import 'auth_gate.dart';
 
-/// Google sign-in page for the web dashboard. Only the accounts listed in
+/// Google sign-in page for the web dashboard and the Android app. Only the accounts listed in
 /// [kAllowedEmails] are allowed through; any other account is signed back out
 /// immediately and shown an error.
 class LoginScreen extends StatefulWidget {
@@ -27,7 +28,11 @@ class _LoginScreenState extends State<LoginScreen> {
       final provider = GoogleAuthProvider()
         ..setCustomParameters({'prompt': 'select_account'});
 
-      final cred = await FirebaseAuth.instance.signInWithPopup(provider);
+      // Web opens a popup; Android opens Google's sign-in page in a browser
+      // tab and returns to the app.
+      final cred = kIsWeb
+          ? await FirebaseAuth.instance.signInWithPopup(provider)
+          : await FirebaseAuth.instance.signInWithProvider(provider);
       final email = cred.user?.email;
 
       // Logged so a near-miss (extra dot, googlemail.com, wrong account picked)
@@ -43,7 +48,9 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() {}); // nudge a rebuild in case the auth stream is slow
     } on FirebaseAuthException catch (e) {
       if (e.code == 'popup-closed-by-user' ||
-          e.code == 'cancelled-popup-request') {
+          e.code == 'cancelled-popup-request' ||
+          e.code == 'web-context-canceled' ||
+          e.code == 'canceled') {
         // User dismissed the popup — not an error worth showing.
       } else {
         if (mounted) setState(() => _error = e.message ?? 'Sign-in failed.');
