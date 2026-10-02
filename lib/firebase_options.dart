@@ -72,11 +72,11 @@ class DefaultFirebaseOptions {
   ///   apiKey -> client[0].api_key[0].current_key
   ///   appId  -> client[0].client_info.mobilesdk_app_id
   ///
-  /// While these are empty the Android app runs without sign-in, as before,
-  /// and its bookings are saved without a name.
+  /// If these are ever emptied the Android app runs without sign-in, and its
+  /// bookings are saved without a name.
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: '',
-    appId: '',
+    apiKey: 'AIzaSyAAVF6lTXH_uZnIYpjqkFDBpdoulmge34Y',
+    appId: '1:54906570613:android:931e7ed941c279a8d6b53c',
     messagingSenderId: '54906570613',
     projectId: 'odon-dashboard-fin',
     storageBucket: 'odon-dashboard-fin.firebasestorage.app',
