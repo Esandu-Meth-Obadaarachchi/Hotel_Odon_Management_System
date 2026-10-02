@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:odon_booking/core/api/api_service.dart';
 import 'package:odon_booking/features/guests/widgets/guest_name_autocomplete.dart';
+import 'widgets/booking_flags.dart';
 import 'widgets/extra_charges.dart';
 import 'widgets/room_picker.dart';
 
@@ -45,6 +46,10 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
   String? _mealStart;
   bool _needDriver = false;
   bool _needKiriPidu = false;
+  bool _earlyCheckIn = false;
+  String? _earlyCheckInTime; // "HH:mm", optional
+  bool _lateCheckOut = false;
+  String? _lateCheckOutTime; // "HH:mm", optional
   List<Map<String, dynamic>> _extraCharges = [];
 
   static const _packages = ['Full Board', 'Half Board', 'Room Only', 'BnB', 'Dinner Only'];
@@ -104,6 +109,10 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
     _mealStart = (savedMealStart == 'Lunch' || savedMealStart == 'Dinner') ? savedMealStart : null;
     _needDriver = b['needDriver'] == true;
     _needKiriPidu = b['needKiriPidu'] == true;
+    _earlyCheckIn = b['earlyCheckIn'] == true;
+    _earlyCheckInTime = parseStayTime(b['earlyCheckInTime']) != null ? b['earlyCheckInTime'].toString() : null;
+    _lateCheckOut = b['lateCheckOut'] == true;
+    _lateCheckOutTime = parseStayTime(b['lateCheckOutTime']) != null ? b['lateCheckOutTime'].toString() : null;
     _extraCharges = extraChargesOf(b);
 
     totalController.addListener(_recalcBalance);
@@ -329,6 +338,10 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
       'guestPhone': guestPhoneController.text,
       'needDriver': _needDriver,
       'needKiriPidu': _needKiriPidu,
+      'earlyCheckIn': _earlyCheckIn,
+      'earlyCheckInTime': _earlyCheckIn ? _earlyCheckInTime : null,
+      'lateCheckOut': _lateCheckOut,
+      'lateCheckOutTime': _lateCheckOut ? _lateCheckOutTime : null,
       // Always sent: the PUT replaces the whole document, so omitting these
       // would wipe the head count off any booking that gets edited.
       'numAdults': int.tryParse(adultsController.text.trim()) ?? _roomCapacity,
@@ -580,6 +593,50 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
                 const Text('Need Kiri Pidu', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
               ],
             ),
+            Row(
+              children: [
+                Checkbox(
+                  value: _earlyCheckIn,
+                  activeColor: Colors.indigo,
+                  onChanged: (v) => setState(() => _earlyCheckIn = v ?? false),
+                ),
+                const SizedBox(width: 4),
+                const Icon(Icons.schedule_rounded, size: 18, color: Colors.indigo),
+                const SizedBox(width: 8),
+                const Text('Early Check-in', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+              ],
+            ),
+            if (_earlyCheckIn)
+              Padding(
+                padding: const EdgeInsets.only(left: 48),
+                child: OptionalTimeField(
+                  value: _earlyCheckInTime,
+                  hint: 'Arrival time (optional)',
+                  onChanged: (t) => setState(() => _earlyCheckInTime = t),
+                ),
+              ),
+            Row(
+              children: [
+                Checkbox(
+                  value: _lateCheckOut,
+                  activeColor: Colors.indigo,
+                  onChanged: (v) => setState(() => _lateCheckOut = v ?? false),
+                ),
+                const SizedBox(width: 4),
+                const Icon(Icons.more_time_rounded, size: 18, color: Colors.indigo),
+                const SizedBox(width: 8),
+                const Text('Late Check-out', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+              ],
+            ),
+            if (_lateCheckOut)
+              Padding(
+                padding: const EdgeInsets.only(left: 48),
+                child: OptionalTimeField(
+                  value: _lateCheckOutTime,
+                  hint: 'Departure time (optional)',
+                  onChanged: (t) => setState(() => _lateCheckOutTime = t),
+                ),
+              ),
             const SizedBox(height: 30),
 
             Center(

@@ -202,6 +202,12 @@ const bookingSchema = new mongoose.Schema({
   mealStart: String,  // 'Lunch' or 'Dinner' — first meal on arrival day for FB/HB
   needDriver: { type: Boolean, default: false },
   needKiriPidu: { type: Boolean, default: false },
+  // Arriving before the 2 PM check-in / leaving after the 11 AM check-out.
+  // The times are "HH:mm" and optional: staff often know only that it is early.
+  earlyCheckIn: { type: Boolean, default: false },
+  earlyCheckInTime: String,
+  lateCheckOut: { type: Boolean, default: false },
+  lateCheckOutTime: String,
   // Head count. The rooms already imply a capacity (Double = 2, Family = 4 …)
   // and that is what numAdults defaults to, but the front desk can correct it.
   // Kids are recorded separately because they are never counted when picking a
@@ -269,6 +275,21 @@ function cleanExtraCharges(list) {
     }))
     .filter((c) => c.reason || (Number.isFinite(c.amount) && c.amount !== 0))
     .map((c) => ({ reason: c.reason, amount: Number.isFinite(c.amount) ? c.amount : 0 }));
+}
+
+// Early check-in / late check-out fields. A time is kept only while its
+// toggle is on and only in "HH:mm" form; anything else is stored as null.
+function stayTimes(body) {
+  const clean = (on, t) =>
+    on && typeof t === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(t) ? t : null;
+  const early = body.earlyCheckIn === true;
+  const late = body.lateCheckOut === true;
+  return {
+    earlyCheckIn: early,
+    earlyCheckInTime: clean(early, body.earlyCheckInTime),
+    lateCheckOut: late,
+    lateCheckOutTime: clean(late, body.lateCheckOutTime),
+  };
 }
 
 // Guest Schema — phone is the unique identifier
@@ -418,6 +439,7 @@ app.post('/bookings', requireUser, async (req, res) => {
     mealStart: req.body.mealStart,
     needDriver: req.body.needDriver ?? false,
     needKiriPidu: req.body.needKiriPidu ?? false,
+    ...stayTimes(req.body),
     ...headCount(req.body),
     extraCharges: cleanExtraCharges(req.body.extraCharges) ?? [],
   });
@@ -462,6 +484,7 @@ app.put('/bookings/:id', requireUser, async (req, res) => {
       mealStart: req.body.mealStart,
       needDriver: req.body.needDriver ?? false,
       needKiriPidu: req.body.needKiriPidu ?? false,
+      ...stayTimes(req.body),
       ...headCount(req.body),
       ...(Array.isArray(req.body.extraCharges) && {
         extraCharges: cleanExtraCharges(req.body.extraCharges),

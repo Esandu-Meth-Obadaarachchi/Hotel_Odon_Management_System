@@ -1,7 +1,78 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 /// Yes/no extras on a booking that the staff need to prepare for, shown as
 /// badges on the booking cards. The driver room keeps its own badge.
+
+/// Turns a stored "HH:mm" time into "10:30 AM". Returns null when no time
+/// was recorded.
+String? formatStayTime(dynamic hhmm) {
+  final t = parseStayTime(hhmm);
+  if (t == null) return null;
+  return DateFormat('h:mm a').format(DateTime(2000, 1, 1, t.hour, t.minute));
+}
+
+TimeOfDay? parseStayTime(dynamic hhmm) {
+  final parts = (hhmm ?? '').toString().split(':');
+  if (parts.length != 2) return null;
+  final h = int.tryParse(parts[0]);
+  final m = int.tryParse(parts[1]);
+  if (h == null || m == null || h < 0 || h > 23 || m < 0 || m > 59) return null;
+  return TimeOfDay(hour: h, minute: m);
+}
+
+/// "HH:mm", the format the booking stores times in.
+String stayTimeToString(TimeOfDay t) =>
+    '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+/// Optional time picker row: "Time (optional) [10:30 AM] ×". [value] and
+/// [onChanged] use the stored "HH:mm" string, null when not set.
+class OptionalTimeField extends StatelessWidget {
+  final String? value;
+  final ValueChanged<String?> onChanged;
+  final String hint;
+
+  const OptionalTimeField({
+    super.key,
+    required this.value,
+    required this.onChanged,
+    this.hint = 'Time (optional)',
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final label = formatStayTime(value);
+    return Row(
+      children: [
+        Icon(Icons.access_time_rounded, size: 16, color: Colors.grey.shade500),
+        const SizedBox(width: 6),
+        Text(hint, style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+        const Spacer(),
+        OutlinedButton(
+          onPressed: () async {
+            final picked = await showTimePicker(
+              context: context,
+              initialTime: parseStayTime(value) ?? TimeOfDay.now(),
+            );
+            if (picked != null) onChanged(stayTimeToString(picked));
+          },
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Colors.indigo,
+            visualDensity: VisualDensity.compact,
+          ),
+          child: Text(label ?? 'Set time'),
+        ),
+        if (label != null)
+          IconButton(
+            tooltip: 'Clear time',
+            visualDensity: VisualDensity.compact,
+            icon: Icon(Icons.close_rounded, size: 18, color: Colors.grey.shade500),
+            onPressed: () => onChanged(null),
+          ),
+      ],
+    );
+  }
+}
 
 /// One badge per flag set on [booking]. Renders nothing when none are set.
 class BookingFlagBadges extends StatelessWidget {
@@ -14,6 +85,18 @@ class BookingFlagBadges extends StatelessWidget {
     final badges = <Widget>[
       if (booking['needKiriPidu'] == true)
         _badge(Icons.rice_bowl_rounded, 'Kiri Pidu Required', Colors.teal),
+      if (booking['earlyCheckIn'] == true)
+        _badge(
+          Icons.schedule_rounded,
+          'Early Check-in · ${formatStayTime(booking['earlyCheckInTime']) ?? 'time not set'}',
+          Colors.green,
+        ),
+      if (booking['lateCheckOut'] == true)
+        _badge(
+          Icons.more_time_rounded,
+          'Late Check-out · ${formatStayTime(booking['lateCheckOutTime']) ?? 'time not set'}',
+          Colors.deepOrange,
+        ),
     ];
     if (badges.isEmpty) return const SizedBox.shrink();
     return Padding(

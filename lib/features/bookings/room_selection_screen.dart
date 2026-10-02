@@ -42,6 +42,10 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
   String? _mealStart;
   bool _needDriver = false;
   bool _needKiriPidu = false;
+  bool _earlyCheckIn = false;
+  String? _earlyCheckInTime; // "HH:mm", optional
+  bool _lateCheckOut = false;
+  String? _lateCheckOutTime; // "HH:mm", optional
 
   List<Map<String, dynamic>> _extraCharges = [];
   final GlobalKey<ExtraChargesEditorState> _chargesKey = GlobalKey();
@@ -360,6 +364,10 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
       'guestPhone': _guestPhoneController.text,
       'needDriver': _needDriver,
       'needKiriPidu': _needKiriPidu,
+      'earlyCheckIn': _earlyCheckIn,
+      'earlyCheckInTime': _earlyCheckIn ? _earlyCheckInTime : null,
+      'lateCheckOut': _lateCheckOut,
+      'lateCheckOutTime': _lateCheckOut ? _lateCheckOutTime : null,
       'numAdults': _adultsEntered,
       'numKids': _kidsEntered,
       'extraCharges': _extraCharges,
@@ -405,6 +413,10 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
       _numOfNights = 0;
       _needDriver = false;
       _needKiriPidu = false;
+      _earlyCheckIn = false;
+      _earlyCheckInTime = null;
+      _lateCheckOut = false;
+      _lateCheckOutTime = null;
       _extraCharges = [];
       _chargesKey.currentState?.reset();
       _adultsController.clear();
@@ -986,6 +998,34 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                           value: _needKiriPidu,
                           color: Colors.teal,
                           onChanged: (v) => setState(() => _needKiriPidu = v),
+                        ),
+                        const SizedBox(height: 10),
+                        OptionToggleCard(
+                          icon: Icons.schedule_rounded,
+                          title: 'Early Check-in',
+                          subtitle: 'Arriving before 2:00 PM',
+                          value: _earlyCheckIn,
+                          color: Colors.green,
+                          onChanged: (v) => setState(() => _earlyCheckIn = v),
+                          child: OptionalTimeField(
+                            value: _earlyCheckInTime,
+                            hint: 'Arrival time (optional)',
+                            onChanged: (t) => setState(() => _earlyCheckInTime = t),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        OptionToggleCard(
+                          icon: Icons.more_time_rounded,
+                          title: 'Late Check-out',
+                          subtitle: 'Leaving after 11:00 AM',
+                          value: _lateCheckOut,
+                          color: Colors.deepOrange,
+                          onChanged: (v) => setState(() => _lateCheckOut = v),
+                          child: OptionalTimeField(
+                            value: _lateCheckOutTime,
+                            hint: 'Departure time (optional)',
+                            onChanged: (t) => setState(() => _lateCheckOutTime = t),
+                          ),
                         ),
                         const SizedBox(height: 20),
 

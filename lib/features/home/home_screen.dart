@@ -5,6 +5,7 @@ import 'package:odon_booking/core/api/api_service.dart';
 import 'package:odon_booking/features/bookings/room_selection_screen.dart';
 import 'package:odon_booking/features/rooms/room_config_screen.dart';
 import 'package:odon_booking/features/bookings/view_bookings_screen.dart';
+import 'package:odon_booking/features/bookings/widgets/booking_flags.dart';
 import 'package:odon_booking/features/auth/login_screen.dart';
 import 'package:odon_booking/features/inventory/add_inventory_item_screen.dart';
 import 'package:odon_booking/features/financials/calculate_profit_page.dart';
@@ -259,6 +260,18 @@ class _HomeScreenState extends State<HomeScreen>
     return {'breakfast': breakfast, 'lunch': lunch, 'dinner': dinner};
   }
 
+  /// Guests arriving early on [_selectedDay] and guests leaving late from it,
+  /// so the rooms and the kitchen can be ready for them.
+  List<Map<String, dynamic>> get _earlyArrivals => _allBookings.where((b) {
+        final ci = DateTime.tryParse(b['checkIn']?.toString() ?? '');
+        return b['earlyCheckIn'] == true && ci != null && _sameDay(ci, _selectedDay);
+      }).toList();
+
+  List<Map<String, dynamic>> get _lateDepartures => _allBookings.where((b) {
+        final co = DateTime.tryParse(b['checkOut']?.toString() ?? '');
+        return b['lateCheckOut'] == true && co != null && _sameDay(co, _selectedDay);
+      }).toList();
+
   int get _occupiedCount {
     final seen = <String>{};
     for (final b in _active) {
@@ -322,6 +335,7 @@ class _HomeScreenState extends State<HomeScreen>
           _statsRow(),
           _roomMap(wrapTiles: false),
           _mealSection(),
+          _timingSection(),
           const SizedBox(height: 24),
         ],
       );
@@ -357,6 +371,7 @@ class _HomeScreenState extends State<HomeScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _mealSection(),
+                    _timingSection(),
                     _quickActions(),
                   ],
                 ),
@@ -822,6 +837,72 @@ class _HomeScreenState extends State<HomeScreen>
           ),
         ]),
       ),
+    );
+  }
+
+  // ── Early check-in / late check-out ───────────────────────────────────────
+
+  Widget _timingSection() {
+    final early = _earlyArrivals;
+    final late = _lateDepartures;
+    if (early.isEmpty && late.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 8, offset: const Offset(0, 2))],
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Row(children: [
+            Icon(Icons.schedule_rounded, color: Color(0xFF4F46E5), size: 18),
+            SizedBox(width: 8),
+            Text('Early Arrivals & Late Departures', style: TextStyle(fontSize: 15,
+                fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+          ]),
+          const SizedBox(height: 8),
+          ...early.map((b) => _timingRow(b, 'Early check-in',
+              formatStayTime(b['earlyCheckInTime']), const Color(0xFF16A34A), Icons.login_rounded)),
+          ...late.map((b) => _timingRow(b, 'Late check-out',
+              formatStayTime(b['lateCheckOutTime']), const Color(0xFFEA580C), Icons.logout_rounded)),
+        ]),
+      ),
+    );
+  }
+
+  Widget _timingRow(Map<String, dynamic> b, String label, String? time, Color color, IconData icon) {
+    final rooms = b['rooms'] as List?;
+    final roomText = (rooms != null && rooms.isNotEmpty)
+        ? rooms.map((r) => r['roomNumber'].toString()).join(', ')
+        : (b['roomNumber']?.toString() ?? '');
+    final guest = (b['guestName'] as String?)?.trim() ?? '';
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            '${guest.isEmpty ? 'Guest' : guest}${roomText.isEmpty ? '' : ' · Room $roomText'}',
+            style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B)),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text('$label · ${time ?? 'time not set'}',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
+        ),
+      ]),
     );
   }
 
