@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:odon_booking/core/api/api_service.dart';
+import 'package:odon_booking/features/bookings/head_count.dart';
 import 'edit_booking_screen.dart';
+import 'package:odon_booking/features/bookings/widgets/booking_flags.dart';
+import 'package:odon_booking/features/bookings/widgets/extra_charges.dart';
 
 class SelectedDayBookingsScreen extends StatefulWidget {
   final DateTime selectedDay;
@@ -33,11 +36,18 @@ class _SelectedDayBookingsScreenState
     try {
       final fetched = await _apiService.fetchBookings(widget.selectedDay);
       setState(() {
+        // Match the calendar screen: a booking counts for every night it
+        // occupies, not only its check-in day.
+        final day = DateTime(widget.selectedDay.year, widget.selectedDay.month,
+            widget.selectedDay.day);
         _bookings = fetched.where((b) {
-          final ci = DateTime.parse(b['checkIn']);
-          return ci.year == widget.selectedDay.year &&
-              ci.month == widget.selectedDay.month &&
-              ci.day == widget.selectedDay.day;
+          final ci = DateTime.tryParse(b['checkIn']?.toString() ?? '');
+          final co = DateTime.tryParse(b['checkOut']?.toString() ?? '');
+          if (ci == null || co == null) return false; // unreadable dates
+          final start = DateTime(ci.year, ci.month, ci.day);
+          final end = DateTime(co.year, co.month, co.day);
+          if (!end.isAfter(start)) return day == start;
+          return !day.isBefore(start) && day.isBefore(end);
         }).toList();
       });
     } catch (_) {}
@@ -207,10 +217,12 @@ class _SelectedDayBookingsScreenState
     final guestPhone = booking['guestPhone'] as String? ?? '';
     final package = booking['package'] as String? ?? 'N/A';
     final extraDetails = (booking['extraDetails'] as String?)?.trim() ?? '';
+    final extraCharges = extraChargesOf(booking);
     final numOfNights = booking['num_of_nights']?.toString() ?? 'N/A';
     final total = booking['total'] as String? ?? '';
     final advance = booking['advance'] as String? ?? '';
     final needDriver = booking['needDriver'] == true;
+    final headCount = headCountOf(booking);
 
     final checkIn =
         booking['checkIn'] != null ? DateTime.parse(booking['checkIn']) : null;
@@ -337,6 +349,8 @@ class _SelectedDayBookingsScreenState
                   ]),
                 ],
 
+                BookingFlagBadges(booking: booking),
+
                 if (needDriver) ...[
                   const SizedBox(height: 8),
                   Container(
@@ -390,6 +404,17 @@ class _SelectedDayBookingsScreenState
                             _fmtDate(checkOut), Colors.red)),
                   ],
                 ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                        child: _detailItem(Icons.person_outline_rounded,
+                            'Adults', '${headCount.adults}', Colors.blueGrey)),
+                    Expanded(
+                        child: _detailItem(Icons.child_care_rounded, 'Kids',
+                            '${headCount.kids}', Colors.pink)),
+                  ],
+                ),
 
                 if (total.isNotEmpty || advance.isNotEmpty) ...[
                   const SizedBox(height: 8),
@@ -405,6 +430,11 @@ class _SelectedDayBookingsScreenState
                                 'Advance', 'LKR $advance', Colors.orange)),
                     ],
                   ),
+                ],
+
+                if (extraCharges.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  ExtraChargesSummary(charges: extraCharges),
                 ],
 
                 if (extraDetails.isNotEmpty) ...[

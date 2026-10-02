@@ -59,6 +59,10 @@ lib/
 │   │   ├── view_bookings_screen.dart
 │   │   ├── edit_booking_screen.dart
 │   │   ├── past_bookings_screen.dart
+│   │   ├── widgets/
+│   │   │   ├── room_picker.dart       # Shared room grid + overlap helper (Add + Edit)
+│   │   │   ├── extra_charges.dart     # Extra charges editor, card summary, helpers
+│   │   │   └── booking_flags.dart     # Kiri pidu / early / late badges, toggle card, time field
 │   │   ├── future_bookings_screen.dart
 │   │   └── selected_day_booking.dart
 │   ├── rooms/
@@ -132,6 +136,12 @@ Database: MongoDB Atlas (`hotel` database). Connection string is hardcoded in `s
   package:       String,  // 'Full Board' | 'Half Board' | 'Room Only' | 'BnB' | 'Dinner Only'
   mealStart:     String,  // 'Lunch' | 'Dinner' — first meal on arrival day (FB/HB only)
   needDriver:    Boolean, // default false — whether a driver room is required for this booking
+  needKiriPidu:  Boolean, // default false — kiri pidu to prepare for this booking
+  earlyCheckIn:     Boolean, // default false — arriving before the 2 PM check-in
+  earlyCheckInTime: String,  // optional 'HH:mm', null when unknown or toggle off
+  lateCheckOut:     Boolean, // default false — leaving after the 11 AM check-out
+  lateCheckOutTime: String,  // optional 'HH:mm', null when unknown or toggle off
+  extraCharges:  [{ reason: String, amount: Number }], // itemised extras, already included in total
   extraDetails:  String,
   checkIn:       Date,
   checkOut:      Date,
@@ -252,10 +262,13 @@ Two passes are done for each selected day:
 
 `lib/features/bookings/edit_booking_screen.dart`
 
-Handles both old and new booking formats via `_isNewFormat` flag. New format shows per-room type dropdowns; legacy shows single text fields. Includes:
+Rooms are picked on the same `RoomPicker` grid as Add Booking. Rooms other bookings hold on the booking's dates show as booked (the booking itself is excluded via `excludeId`). Legacy single-room bookings load into the grid and are saved back in the `rooms[]` format with `roomNumber`/`roomType` cleared. Rooms on the booking that are missing from the room config are kept and shown as removable chips.
+
+Check-in and check-out are editable. Each date change and every save re-check availability: any selected room now held by another booking is unselected and a dialog asks the user to pick replacements. Includes:
 - Package dropdown (including Dinner Only)
 - First Meal on Arrival dropdown (shown only for Full Board / Half Board)
-- Driver Room checkbox (`_needDriver`)
+- Driver Room, Kiri Pidu, Early Check-in and Late Check-out checkboxes (the last two with an optional time)
+- Extra charges editor (changes move Total by the same amount)
 - Balance method checkboxes (Bank / Cash)
 
 ## Guests Feature
@@ -294,6 +307,14 @@ Phone-keyed guest directory. Guests are auto-populated from booking saves — th
 - **Edit booking** (`lib/features/bookings/edit_booking_screen.dart`): Same checkbox, pre-populated from `booking['needDriver'] == true`.
 - **View bookings** (`lib/features/bookings/view_bookings_screen.dart`): Amber badge shown below room chips when `needDriver == true`.
 - **DB**: `needDriver: Boolean` with `default: false` in Booking schema. Both `POST /bookings` and `PUT /bookings/:id` explicitly pass `needDriver: req.body.needDriver ?? false`. PUT uses `{ $set: updateData }` to guarantee the field is written.
+
+## Extra Charges, Kiri Pidu, Early Check-in / Late Check-out
+
+- **Extra charges** (`extraCharges`): rows of reason + price on Add and Edit Booking. Editing them moves the Total by the change (a blank Total stays blank). The invoice screen passes its charges into the booking prefill. Cards show them via `ExtraChargesSummary`; `booking_invoice.dart` itemises them when rebuilding a PDF from a booking. Backend `cleanExtraCharges` drops blank rows; PUT leaves stored charges alone when the field is not sent.
+- **Kiri Pidu** (`needKiriPidu`): toggle like the driver room. Teal badge on booking cards.
+- **Early check-in / late check-out**: toggles with an optional `HH:mm` time (`OptionalTimeField`). Badges on booking cards, plus an "Early Arrivals & Late Departures" card on the home dashboard for the selected day. Backend `stayTimes()` validates the time and nulls it when the toggle is off.
+
+`BookingFlagBadges` renders all three flag badges and is used on the view, full-day, past and upcoming booking cards.
 
 ## Packages
 

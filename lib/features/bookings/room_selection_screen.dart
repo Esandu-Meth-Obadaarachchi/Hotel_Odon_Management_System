@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:odon_booking/core/api/api_service.dart';
 import 'package:odon_booking/features/guests/widgets/guest_name_autocomplete.dart';
+import 'widgets/booking_flags.dart';
+import 'widgets/extra_charges.dart';
+import 'widgets/room_picker.dart';
 
 class RoomSelectionScreen extends StatefulWidget {
   /// Optional prefill data (e.g. coming from the Generate Invoice screen).
   /// Recognised keys: guestName, guestPhone (String); checkIn, checkOut
   /// (DateTime); package, mealStart (String); total, advance, extraDetails
-  /// (String); needDriver (bool).
+  /// (String); needDriver (bool); numAdults, numKids (int).
   final Map<String, dynamic>? prefill;
 
   RoomSelectionScreen({this.prefill});
@@ -25,12 +28,27 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
   final TextEditingController _extraDetailsController = TextEditingController();
   final TextEditingController _totalCostController = TextEditingController();
   final TextEditingController _advanceAmountController = TextEditingController();
+  final TextEditingController _adultsController = TextEditingController();
+  final TextEditingController _kidsController = TextEditingController();
+
+  /// True once the adults box has been typed into. From then on the room
+  /// selection stops overwriting it — the user knows something the room type
+  /// does not.
+  bool _adultsEdited = false;
 
   List<Map<String, dynamic>> _roomConfig = [];
   bool _configLoading = true;
 
   String? _mealStart;
   bool _needDriver = false;
+  bool _needKiriPidu = false;
+  bool _earlyCheckIn = false;
+  String? _earlyCheckInTime; // "HH:mm", optional
+  bool _lateCheckOut = false;
+  String? _lateCheckOutTime; // "HH:mm", optional
+
+  List<Map<String, dynamic>> _extraCharges = [];
+  final GlobalKey<ExtraChargesEditorState> _chargesKey = GlobalKey();
 
   Set<String> _selectedRooms = {};
   Set<String> _extraBedRooms = {};
@@ -70,6 +88,21 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
 
     _needDriver = p['needDriver'] == true;
 
+    // The invoice total already includes these, so they carry over as-is.
+    _extraCharges = extraChargesOf(p);
+
+    // The invoice already asked for the head count, so carry it over rather
+    // than making the front desk key it in twice. An adults figure that came
+    // from the invoice counts as user-entered: the rooms picked here must not
+    // overwrite it.
+    final adults = p['numAdults'];
+    if (adults is int && adults > 0) {
+      _adultsController.text = adults.toString();
+      _adultsEdited = true;
+    }
+    final kids = p['numKids'];
+    if (kids is int && kids > 0) _kidsController.text = kids.toString();
+
     final ci = p['checkIn'];
     final co = p['checkOut'];
     if (ci is DateTime && co is DateTime) {
@@ -97,22 +130,36 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
     }
   }
 
-  String _getRoomType(Map<String, dynamic> roomCfg) {
-    final baseType = roomCfg['baseType'] as String;
-    final hasExtra = _extraBedRooms.contains(roomCfg['roomNumber'] as String);
-    if (baseType == 'Family') return hasExtra ? 'Family Plus' : 'Family';
-    return hasExtra ? 'Triple' : 'Double';
+  String _getRoomType(Map<String, dynamic> roomCfg) => effectiveRoomType(
+        roomCfg,
+        extraBed: _extraBedRooms.contains(roomCfg['roomNumber'] as String),
+      );
+
+  int _getPax(String roomType) => paxForType(roomType);
+
+  /// Combined capacity of the rooms currently selected. This is the number the
+  /// adults box starts from, because the room chosen is what implies the head
+  /// count — a Family room means four adults unless told otherwise.
+  int get _autoAdults => _selectedRooms.fold<int>(0, (sum, roomNum) {
+        final cfg = _roomConfig.firstWhere(
+          (r) => r['roomNumber'] == roomNum,
+          orElse: () => {},
+        );
+        return sum + (cfg.isEmpty ? 0 : _getPax(_getRoomType(cfg)));
+      });
+
+  /// Follows the room selection until the user types their own number.
+  /// Call inside setState, after the selection has changed.
+  void _syncAdults() {
+    if (_adultsEdited) return;
+    final auto = _autoAdults;
+    _adultsController.text = auto == 0 ? '' : auto.toString();
   }
 
-  int _getPax(String roomType) {
-    switch (roomType) {
-      case 'Double': return 2;
-      case 'Triple': return 3;
-      case 'Family': return 4;
-      case 'Family Plus': return 5;
-      default: return 2;
-    }
-  }
+  int get _adultsEntered =>
+      int.tryParse(_adultsController.text.trim()) ?? _autoAdults;
+
+  int get _kidsEntered => int.tryParse(_kidsController.text.trim()) ?? 0;
 
   Future<void> _selectCheckInDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
@@ -171,29 +218,27 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
     if (_checkInDate == null || _checkOutDate == null) return;
     try {
       final bookings = await _apiService.fetchBookingsForDateRange(_checkInDate!, _checkOutDate!);
-      final booked = <String>{};
-      for (final booking in bookings) {
-        final bookingCheckIn = DateTime.parse(booking['checkIn']);
-        final bookingCheckOut = DateTime.parse(booking['checkOut']);
-        final normBI = DateTime(bookingCheckIn.year, bookingCheckIn.month, bookingCheckIn.day);
-        final normBO = DateTime(bookingCheckOut.year, bookingCheckOut.month, bookingCheckOut.day);
-        final normCI = DateTime(_checkInDate!.year, _checkInDate!.month, _checkInDate!.day);
-        final normCO = DateTime(_checkOutDate!.year, _checkOutDate!.month, _checkOutDate!.day);
-
-        bool overlaps = normCI.isBefore(normBO) && normCO.isAfter(normBI);
-        if (normCI.isAtSameMomentAs(normBO)) overlaps = false;
-
-        if (overlaps) {
-          if (booking['rooms'] != null && (booking['rooms'] as List).isNotEmpty) {
-            for (final r in booking['rooms'] as List) {
-              booked.add(r['roomNumber'].toString());
-            }
-          } else if (booking['roomNumber'] != null) {
-            booked.add(booking['roomNumber'].toString());
-          }
-        }
+      final booked = bookedRoomsBetween(bookings, _checkInDate!, _checkOutDate!);
+      // Rooms picked before the dates changed may now be taken.
+      final clashing = _selectedRooms.intersection(booked);
+      setState(() {
+        _bookedRooms = booked;
+        _selectedRooms.removeAll(clashing);
+        _extraBedRooms.removeAll(clashing);
+        _syncAdults();
+      });
+      if (clashing.isNotEmpty && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Room${clashing.length > 1 ? 's' : ''} ${clashing.join(', ')} '
+              '${clashing.length > 1 ? 'are' : 'is'} booked on these dates and '
+              '${clashing.length > 1 ? 'were' : 'was'} unselected. Please pick again.',
+            ),
+            backgroundColor: Colors.orange.shade700,
+          ),
+        );
       }
-      setState(() => _bookedRooms = booked);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Failed to fetch existing bookings')),
@@ -318,6 +363,14 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
       'guestName': _guestNameController.text,
       'guestPhone': _guestPhoneController.text,
       'needDriver': _needDriver,
+      'needKiriPidu': _needKiriPidu,
+      'earlyCheckIn': _earlyCheckIn,
+      'earlyCheckInTime': _earlyCheckIn ? _earlyCheckInTime : null,
+      'lateCheckOut': _lateCheckOut,
+      'lateCheckOutTime': _lateCheckOut ? _lateCheckOutTime : null,
+      'numAdults': _adultsEntered,
+      'numKids': _kidsEntered,
+      'extraCharges': _extraCharges,
     };
 
     print('[DEBUG] Saving booking, needDriver=$_needDriver');
@@ -359,235 +412,29 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
       _checkOutDate = null;
       _numOfNights = 0;
       _needDriver = false;
+      _needKiriPidu = false;
+      _earlyCheckIn = false;
+      _earlyCheckInTime = null;
+      _lateCheckOut = false;
+      _lateCheckOutTime = null;
+      _extraCharges = [];
+      _chargesKey.currentState?.reset();
+      _adultsController.clear();
+      _kidsController.clear();
+      _adultsEdited = false;
     });
   }
 
-  // ─── Room card ───────────────────────────────────────────────────────────────
-
-  Widget _buildRoomCard(Map<String, dynamic> room) {
-    final roomNum = room['roomNumber'] as String;
-    final baseType = room['baseType'] as String;
-    final isBlocked = room['isBlocked'] == true;
-    final isBooked = _bookedRooms.contains(roomNum);
-    final isSelected = _selectedRooms.contains(roomNum);
-    final hasExtra = _extraBedRooms.contains(roomNum);
-
-    final roomType = isSelected ? _getRoomType(room) : baseType;
-    final pax = _getPax(roomType);
-
-    Color bgColor;
-    Color textColor = const Color(0xFF1E293B);
-
-    if (isBlocked) {
-      bgColor = Colors.grey.shade300;
-      textColor = Colors.grey.shade600;
-    } else if (isBooked) {
-      bgColor = Colors.red.shade400;
-      textColor = Colors.white;
-    } else if (isSelected && hasExtra) {
-      bgColor = Colors.orange.shade400;
-      textColor = Colors.white;
-    } else if (isSelected) {
-      bgColor = Colors.green.shade500;
-      textColor = Colors.white;
-    } else {
-      bgColor = Colors.white;
-    }
-
-    return GestureDetector(
-      onTap: (isBlocked || isBooked)
-          ? null
-          : () {
-              setState(() {
-                if (_selectedRooms.contains(roomNum)) {
-                  _selectedRooms.remove(roomNum);
-                  _extraBedRooms.remove(roomNum);
-                } else {
-                  _selectedRooms.add(roomNum);
-                }
-              });
-            },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected
-                ? (hasExtra ? Colors.orange.shade700 : Colors.green.shade700)
-                : Colors.grey.shade300,
-            width: isSelected ? 2 : 1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.07),
-              blurRadius: 5,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.all(4),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      roomNum.padLeft(3, '0'),
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                        color: textColor,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      isBlocked
-                          ? 'Blocked'
-                          : isBooked
-                              ? 'Booked'
-                              : (isSelected ? roomType : baseType),
-                      style: TextStyle(
-                        fontSize: 9,
-                        color: textColor.withValues(alpha: 0.9),
-                        fontWeight: FontWeight.w500,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    if (isSelected) ...[
-                      const SizedBox(height: 1),
-                      Text(
-                        '${pax}pax',
-                        style: TextStyle(
-                          fontSize: 9,
-                          color: textColor.withValues(alpha: 0.8),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-            if (isSelected && !isBlocked && !isBooked)
-              Positioned(
-                top: 3,
-                right: 3,
-                child: GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      if (_extraBedRooms.contains(roomNum)) {
-                        _extraBedRooms.remove(roomNum);
-                      } else {
-                        _extraBedRooms.add(roomNum);
-                      }
-                    });
-                  },
-                  child: Container(
-                    width: 20,
-                    height: 20,
-                    decoration: BoxDecoration(
-                      color: hasExtra ? Colors.white : Colors.white.withValues(alpha: 0.6),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: hasExtra ? Colors.orange.shade700 : Colors.green.shade700,
-                        width: 1.5,
-                      ),
-                    ),
-                    child: Icon(
-                      Icons.add,
-                      size: 13,
-                      color: hasExtra ? Colors.orange.shade700 : Colors.green.shade700,
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFloorSection(String floor) {
-    final rooms = _roomConfig.where((r) => r['floor'] == floor).toList();
-    if (rooms.isEmpty) return const SizedBox.shrink();
-
-    final isGround = floor == 'Ground';
-
-    return Card(
-      elevation: 0,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Floor header
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: isGround ? Colors.indigo.shade50 : Colors.purple.shade50,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
-              border: Border(
-                bottom: BorderSide(
-                  color: isGround ? Colors.indigo.shade100 : Colors.purple.shade100,
-                ),
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: isGround ? Colors.indigo : Colors.purple,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '$floor Floor',
-                  style: TextStyle(
-                    fontFamily: 'Outfit',
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                    color: isGround ? Colors.indigo.shade700 : Colors.purple.shade700,
-                    letterSpacing: 0.3,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  '${rooms.length} rooms',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isGround ? Colors.indigo.shade400 : Colors.purple.shade400,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Room grid
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 4,
-                mainAxisSpacing: 10,
-                crossAxisSpacing: 10,
-                childAspectRatio: 0.9,
-              ),
-              itemCount: rooms.length,
-              itemBuilder: (context, index) => _buildRoomCard(rooms[index]),
-            ),
-          ),
-        ],
-      ),
-    );
+  @override
+  void dispose() {
+    _guestNameController.dispose();
+    _guestPhoneController.dispose();
+    _extraDetailsController.dispose();
+    _totalCostController.dispose();
+    _advanceAmountController.dispose();
+    _adultsController.dispose();
+    _kidsController.dispose();
+    super.dispose();
   }
 
   Widget _buildSelectedSummary() {
@@ -674,6 +521,132 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Adults + kids. Adults is prefilled from the rooms picked above and stays
+  /// in step with them until it is typed into; kids is always manual, because
+  /// children never enter into which room gets booked.
+  Widget _buildHeadCount() {
+    final auto = _autoAdults;
+    final kids = _kidsEntered;
+
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _indigoField(
+                    controller: _adultsController,
+                    label: 'Adults (Pax)',
+                    icon: Icons.person_outline_rounded,
+                    keyboardType: TextInputType.number,
+                    onChanged: (_) => setState(() => _adultsEdited = true),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _indigoField(
+                    controller: _kidsController,
+                    label: 'Kids',
+                    icon: Icons.child_care_rounded,
+                    keyboardType: TextInputType.number,
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            if (_adultsEdited && auto > 0 && _adultsEntered != auto)
+              // The rooms say one thing and the box says another. That is
+              // allowed — it is the whole point of the field — but the gap is
+              // worth showing, along with a one-tap way back.
+              Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, size: 13, color: Colors.orange.shade700),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Rooms selected fit $auto adults',
+                      style: TextStyle(fontSize: 11.5, color: Colors.orange.shade800),
+                    ),
+                  ),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(6),
+                    onTap: () => setState(() {
+                      _adultsEdited = false;
+                      _syncAdults();
+                    }),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      child: Text(
+                        'Reset',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.indigo.shade600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            else
+              Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, size: 13, color: Colors.grey.shade500),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      auto == 0
+                          ? 'Adults fills in once rooms are selected. Kids are never counted when picking a room — record them here.'
+                          : 'Adults comes from the rooms selected; edit it if the party differs. Kids are tracked separately.',
+                      style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
+                    ),
+                  ),
+                ],
+              ),
+            if (kids > 0) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: Colors.indigo.shade50,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.groups_rounded, size: 14, color: Colors.indigo.shade600),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Total in party: ${_adultsEntered + kids} '
+                      '($_adultsEntered adult${_adultsEntered == 1 ? '' : 's'}, '
+                      '$kids kid${kids == 1 ? '' : 's'})',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.indigo.shade700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -917,18 +890,36 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                         // ── Room selection ────────────────────────────────
                         _sectionLabel('Select Rooms'),
                         const SizedBox(height: 10),
-                        _buildFloorSection('Ground'),
-                        const SizedBox(height: 10),
-                        _buildFloorSection('Upper'),
-                        const SizedBox(height: 12),
-
-                        // Legend
-                        _buildLegend(),
+                        RoomPicker(
+                          roomConfig: _roomConfig,
+                          selectedRooms: _selectedRooms,
+                          extraBedRooms: _extraBedRooms,
+                          bookedRooms: _bookedRooms,
+                          onToggleRoom: (roomNum) => setState(() {
+                            if (_selectedRooms.contains(roomNum)) {
+                              _selectedRooms.remove(roomNum);
+                              _extraBedRooms.remove(roomNum);
+                            } else {
+                              _selectedRooms.add(roomNum);
+                            }
+                            _syncAdults();
+                          }),
+                          onToggleExtraBed: (roomNum) => setState(() {
+                            if (!_extraBedRooms.remove(roomNum)) _extraBedRooms.add(roomNum);
+                            _syncAdults();
+                          }),
+                        ),
                         const SizedBox(height: 12),
 
                         // Selected summary
                         _buildSelectedSummary(),
                         if (_selectedRooms.isNotEmpty) const SizedBox(height: 20),
+
+                        // ── Head count ────────────────────────────────────
+                        _sectionLabel('Head Count'),
+                        const SizedBox(height: 10),
+                        _buildHeadCount(),
+                        const SizedBox(height: 20),
 
                         // ── Options ───────────────────────────────────────
                         _sectionLabel('Options'),
@@ -999,6 +990,43 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                             ),
                           ),
                         ),
+                        const SizedBox(height: 10),
+                        OptionToggleCard(
+                          icon: Icons.rice_bowl_rounded,
+                          title: 'Need Kiri Pidu',
+                          subtitle: 'Prepare kiri pidu for this booking',
+                          value: _needKiriPidu,
+                          color: Colors.teal,
+                          onChanged: (v) => setState(() => _needKiriPidu = v),
+                        ),
+                        const SizedBox(height: 10),
+                        OptionToggleCard(
+                          icon: Icons.schedule_rounded,
+                          title: 'Early Check-in',
+                          subtitle: 'Arriving before 2:00 PM',
+                          value: _earlyCheckIn,
+                          color: Colors.green,
+                          onChanged: (v) => setState(() => _earlyCheckIn = v),
+                          child: OptionalTimeField(
+                            value: _earlyCheckInTime,
+                            hint: 'Arrival time (optional)',
+                            onChanged: (t) => setState(() => _earlyCheckInTime = t),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        OptionToggleCard(
+                          icon: Icons.more_time_rounded,
+                          title: 'Late Check-out',
+                          subtitle: 'Leaving after 11:00 AM',
+                          value: _lateCheckOut,
+                          color: Colors.deepOrange,
+                          onChanged: (v) => setState(() => _lateCheckOut = v),
+                          child: OptionalTimeField(
+                            value: _lateCheckOutTime,
+                            hint: 'Departure time (optional)',
+                            onChanged: (t) => setState(() => _lateCheckOutTime = t),
+                          ),
+                        ),
                         const SizedBox(height: 20),
 
                         // ── Financial details ─────────────────────────────
@@ -1027,6 +1055,31 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                                   label: 'Advance Amount (LKR)',
                                   icon: Icons.payments_outlined,
                                   keyboardType: TextInputType.number,
+                                ),
+                                const SizedBox(height: 12),
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    'Extra charges (added to the total)',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                ExtraChargesEditor(
+                                  key: _chargesKey,
+                                  initialCharges: _extraCharges,
+                                  onChanged: (charges) => setState(() {
+                                    _totalCostController.text = adjustTotalForCharges(
+                                      _totalCostController.text,
+                                      sumExtraCharges(_extraCharges),
+                                      sumExtraCharges(charges),
+                                    );
+                                    _extraCharges = charges;
+                                  }),
                                 ),
                                 const SizedBox(height: 12),
                                 _indigoField(
@@ -1141,50 +1194,19 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
     );
   }
 
-  Widget _buildLegend() {
-    return Wrap(
-      spacing: 10,
-      runSpacing: 6,
-      children: [
-        _legendChip(Colors.white, Colors.grey.shade400, 'Available'),
-        _legendChip(Colors.green.shade500, Colors.green.shade500, 'Selected'),
-        _legendChip(Colors.orange.shade400, Colors.orange.shade400, '+Extra bed'),
-        _legendChip(Colors.red.shade400, Colors.red.shade400, 'Booked'),
-        _legendChip(Colors.grey.shade300, Colors.grey.shade300, 'Blocked'),
-      ],
-    );
-  }
-
-  Widget _legendChip(Color fill, Color border, String label) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 12,
-          height: 12,
-          decoration: BoxDecoration(
-            color: fill,
-            borderRadius: BorderRadius.circular(3),
-            border: Border.all(color: border),
-          ),
-        ),
-        const SizedBox(width: 4),
-        Text(label, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
-      ],
-    );
-  }
-
   Widget _indigoField({
     required TextEditingController controller,
     required String label,
     required IconData icon,
     int maxLines = 1,
     TextInputType keyboardType = TextInputType.text,
+    ValueChanged<String>? onChanged,
   }) {
     return TextFormField(
       controller: controller,
       maxLines: maxLines,
       keyboardType: keyboardType,
+      onChanged: onChanged,
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, color: Colors.indigo.shade400, size: 20),

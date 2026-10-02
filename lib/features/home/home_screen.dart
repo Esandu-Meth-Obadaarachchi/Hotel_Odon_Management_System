@@ -1,14 +1,19 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:odon_booking/core/api/api_service.dart';
 import 'package:odon_booking/features/bookings/room_selection_screen.dart';
 import 'package:odon_booking/features/rooms/room_config_screen.dart';
 import 'package:odon_booking/features/bookings/view_bookings_screen.dart';
+import 'package:odon_booking/features/bookings/widgets/booking_flags.dart';
 import 'package:odon_booking/features/auth/login_screen.dart';
 import 'package:odon_booking/features/inventory/add_inventory_item_screen.dart';
 import 'package:odon_booking/features/financials/calculate_profit_page.dart';
 import 'package:odon_booking/features/invoices/generate_invoice_screen.dart';
 import 'package:odon_booking/features/financials/expenses_screen.dart';
 import 'package:odon_booking/features/guests/guests_list_screen.dart';
+import 'package:odon_booking/features/settings/user_access_screen.dart';
+import 'package:odon_booking/features/auth/auth_gate.dart';
 
 // ── Package meta ──────────────────────────────────────────────────────────────
 
@@ -35,8 +40,13 @@ class HomeScreen extends StatefulWidget {
   _HomeScreenState createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   final ApiService _apiService = ApiService();
+
+  // The room overview goes stale while the screen sits open (e.g. the manager
+  // adds bookings from another device), so re-pull quietly on this interval.
+  static const _autoRefreshInterval = Duration(seconds: 30);
 
   late TabController _tabController;
   int _dayOffset = 0; // 0 = today, 1 = tomorrow
@@ -46,9 +56,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   bool _loading = true;
   String? _error;
 
+  Timer? _autoRefreshTimer;
+  bool _refreshing = false;
+  DateTime? _lastUpdated;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _tabController = TabController(length: 2, vsync: this)
       ..addListener(() {
         if (!_tabController.indexIsChanging) {
@@ -56,12 +71,35 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         }
       });
     _fetchData();
+    _startAutoRefresh();
   }
 
   @override
   void dispose() {
+    _autoRefreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _tabController.dispose();
     super.dispose();
+  }
+
+  // ── Auto refresh ────────────────────────────────────────────────────────────
+
+  void _startAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer =
+        Timer.periodic(_autoRefreshInterval, (_) => _fetchData(silent: true));
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Coming back from the background: refresh now, then resume the ticker.
+      _fetchData(silent: true);
+      _startAutoRefresh();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      _autoRefreshTimer?.cancel();
+    }
   }
 
   // ── Data ────────────────────────────────────────────────────────────────────
@@ -71,20 +109,36 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     return DateTime(n.year, n.month, n.day + _dayOffset);
   }
 
-  Future<void> _fetchData() async {
-    setState(() { _loading = true; _error = null; });
+  // [silent] keeps the current data on screen while refetching — used by the
+  // auto refresh so the overview updates without a spinner or scroll jump.
+  Future<void> _fetchData({bool silent = false}) async {
+    if (_refreshing) return;
+    _refreshing = true;
+    if (!silent) {
+      setState(() { _loading = true; _error = null; });
+    } else {
+      setState(() {});
+    }
     try {
       final bookings = await _apiService.fetchBookings(DateTime.now());
       final config   = await _apiService.fetchRoomConfig();
+      if (!mounted) return;
       setState(() {
         _allBookings = bookings;
         _roomConfig  = List<Map<String, dynamic>>.from(
           (config['rooms'] as List).map((r) => Map<String, dynamic>.from(r)),
         );
         _loading = false;
+        _error = null;
+        _lastUpdated = DateTime.now();
       });
     } catch (e) {
+      if (!mounted) return;
+      // On a silent refresh keep whatever is already on screen; only flag it.
       setState(() { _loading = false; _error = e.toString(); });
+    } finally {
+      _refreshing = false;
+      if (mounted) setState(() {});
     }
   }
 
@@ -206,6 +260,18 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     return {'breakfast': breakfast, 'lunch': lunch, 'dinner': dinner};
   }
 
+  /// Guests arriving early on [_selectedDay] and guests leaving late from it,
+  /// so the rooms and the kitchen can be ready for them.
+  List<Map<String, dynamic>> get _earlyArrivals => _allBookings.where((b) {
+        final ci = DateTime.tryParse(b['checkIn']?.toString() ?? '');
+        return b['earlyCheckIn'] == true && ci != null && _sameDay(ci, _selectedDay);
+      }).toList();
+
+  List<Map<String, dynamic>> get _lateDepartures => _allBookings.where((b) {
+        final co = DateTime.tryParse(b['checkOut']?.toString() ?? '');
+        return b['lateCheckOut'] == true && co != null && _sameDay(co, _selectedDay);
+      }).toList();
+
   int get _occupiedCount {
     final seen = <String>{};
     for (final b in _active) {
@@ -223,12 +289,23 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   int get _availableRooms =>
       _roomConfig.where((r) => r['isBlocked'] != true).length - _occupiedCount;
 
+  // ── Layout ────────────────────────────────────────────────────────────────
+
+  /// Widest the dashboard content is allowed to get on large screens.
+  static const double _maxContentWidth = 1240;
+
+  /// Two-column dashboard once there is room for it (desktop / large tablet).
+  bool _isWide(double w) => w >= 900;
+
   // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
+    final wide = _isWide(MediaQuery.of(context).size.width);
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
+      // Phones reach the actions from the bottom bar instead of a tile grid.
+      bottomNavigationBar: wide ? null : _bottomBar(),
       body: RefreshIndicator(
         onRefresh: _fetchData,
         child: _loading
@@ -237,17 +314,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 slivers: [
                   _appBar(),
                   SliverToBoxAdapter(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _dayToggle(),
-                        if (_error != null) _errorBanner(),
-                        _statsRow(),
-                        _roomMap(),
-                        _mealSection(),
-                        _quickActions(),
-                        const SizedBox(height: 24),
-                      ],
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: _maxContentWidth),
+                        child: wide ? _wideBody() : _narrowBody(),
+                      ),
                     ),
                   ),
                 ],
@@ -255,6 +326,61 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       ),
     );
   }
+
+  Widget _narrowBody() => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _dayToggle(),
+          if (_error != null) _errorBanner(),
+          _statsRow(),
+          _roomMap(wrapTiles: false),
+          _mealSection(),
+          _timingSection(),
+          const SizedBox(height: 24),
+        ],
+      );
+
+  /// Desktop: toggle + stats span the full width, then room map (wide column)
+  /// sits beside meals + quick actions so nothing is stretched edge-to-edge.
+  Widget _wideBody() => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_error != null) _errorBanner(),
+          // Toggle and stats share one line — three full-width stat cards on a
+          // desktop monitor would otherwise be absurdly wide and mostly empty.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(width: 300, child: _dayToggleBox()),
+                  const SizedBox(width: 16),
+                  ..._statCards(),
+                ],
+              ),
+            ),
+          ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(flex: 3, child: _roomMap(wrapTiles: true)),
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _mealSection(),
+                    _timingSection(),
+                    _quickActions(),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 32),
+        ],
+      );
 
   // ── App bar ───────────────────────────────────────────────────────────────
 
@@ -292,12 +418,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       const Text('ODON Hotel',
                           style: TextStyle(color: Colors.white, fontSize: 20,
                               fontWeight: FontWeight.bold, letterSpacing: 0.4)),
-                      Text(dateStr,
+                      Text('$dateStr  •  ${_freshnessLabel()}',
                           style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 12)),
                     ],
                   ),
                   const Spacer(),
-                  _iconBtn(Icons.refresh, _fetchData),
+                  _refreshBtn(),
                   const SizedBox(width: 8),
                   _iconBtn(Icons.logout, () => Navigator.pushAndRemoveUntil(
                     context, MaterialPageRoute(builder: (_) => LoginScreen()), (_) => false)),
@@ -308,6 +434,33 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         ),
       ),
     );
+  }
+
+  // Tells the user how stale the numbers are, so a quiet refresh is visible.
+  String _freshnessLabel() {
+    if (_refreshing) return 'Updating…';
+    if (_lastUpdated == null) return 'Not updated yet';
+    final mins = DateTime.now().difference(_lastUpdated!).inMinutes;
+    if (mins < 1) return 'Updated just now';
+    if (mins == 1) return 'Updated 1 min ago';
+    return 'Updated $mins mins ago';
+  }
+
+  Widget _refreshBtn() {
+    if (_refreshing) {
+      return Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.18),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: const SizedBox(
+          width: 19, height: 19,
+          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+        ),
+      );
+    }
+    return _iconBtn(Icons.refresh, _fetchData);
   }
 
   Widget _iconBtn(IconData icon, VoidCallback onTap) => GestureDetector(
@@ -324,10 +477,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   // ── Day toggle ───────────────────────────────────────────────────────────
 
-  Widget _dayToggle() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-      child: Container(
+  Widget _dayToggle() => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+        child: _dayToggleBox(),
+      );
+
+  Widget _dayToggleBox() {
+    return Container(
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
@@ -356,8 +512,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             ])),
           ],
         ),
-      ),
-    );
+      );
   }
 
   // ── Error banner ─────────────────────────────────────────────────────────
@@ -380,18 +535,19 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   // ── Stats row ────────────────────────────────────────────────────────────
 
-  Widget _statsRow() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: Row(children: [
+  Widget _statsRow() => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        child: Row(children: _statCards()),
+      );
+
+  List<Widget> _statCards() => [
         _statCard('$_occupiedCount', 'Occupied', Icons.bed_rounded, const Color(0xFF4F46E5)),
         const SizedBox(width: 10),
-        _statCard('${_availableRooms.clamp(0, 99)}', 'Available', Icons.door_back_door_rounded, const Color(0xFF16A34A)),
+        _statCard('${_availableRooms.clamp(0, 99)}', 'Available',
+            Icons.door_back_door_rounded, const Color(0xFF16A34A)),
         const SizedBox(width: 10),
         _statCard('$_totalGuests', 'Guests', Icons.people_rounded, const Color(0xFF0891B2)),
-      ]),
-    );
-  }
+      ];
 
   Widget _statCard(String value, String label, IconData icon, Color color) => Expanded(
     child: Container(
@@ -413,7 +569,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   // ── Room map ─────────────────────────────────────────────────────────────
 
-  Widget _roomMap() {
+  Widget _roomMap({required bool wrapTiles}) {
     final ground = _roomConfig.where((r) => r['floor'] == 'Ground').toList();
     final upper  = _roomConfig.where((r) => r['floor'] == 'Upper').toList();
 
@@ -452,12 +608,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
           if (ground.isNotEmpty) ...[
             _floorLabel('Ground Floor'),
-            _floorRow(ground),
+            _floorRow(ground, wrapTiles),
             const SizedBox(height: 4),
           ],
           if (upper.isNotEmpty) ...[
             _floorLabel('Upper Floor'),
-            _floorRow(upper),
+            _floorRow(upper, wrapTiles),
           ],
           const SizedBox(height: 14),
         ]),
@@ -498,22 +654,36 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             letterSpacing: 0.5)),
   );
 
-  Widget _floorRow(List<Map<String, dynamic>> rooms) => SizedBox(
-    height: 120,
-    child: ListView.builder(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      itemCount: rooms.length,
-      itemBuilder: (_, i) {
-        final room = rooms[i];
-        final info = _infoForRoom(room['roomNumber'] as String);
-        return Padding(
+  Widget _floorRow(List<Map<String, dynamic>> rooms, bool wrapTiles) {
+    Widget tileFor(Map<String, dynamic> room) =>
+        _roomTile(room, _infoForRoom(room['roomNumber'] as String));
+
+    // Desktop has the width to show every room at once — wrap instead of
+    // hiding rooms behind a horizontal scroll that needs a mouse drag.
+    if (wrapTiles) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: rooms.map((r) => SizedBox(height: 120, child: tileFor(r))).toList(),
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: 120,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        itemCount: rooms.length,
+        itemBuilder: (_, i) => Padding(
           padding: const EdgeInsets.only(right: 8),
-          child: _roomTile(room, info),
-        );
-      },
-    ),
-  );
+          child: tileFor(rooms[i]),
+        ),
+      ),
+    );
+  }
 
   Widget _roomTile(Map<String, dynamic> room, Map<String, dynamic>? info) {
     final roomNum   = (room['roomNumber'] as String).padLeft(3, '0');
@@ -670,6 +840,72 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
+  // ── Early check-in / late check-out ───────────────────────────────────────
+
+  Widget _timingSection() {
+    final early = _earlyArrivals;
+    final late = _lateDepartures;
+    if (early.isEmpty && late.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 8, offset: const Offset(0, 2))],
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Row(children: [
+            Icon(Icons.schedule_rounded, color: Color(0xFF4F46E5), size: 18),
+            SizedBox(width: 8),
+            Text('Early Arrivals & Late Departures', style: TextStyle(fontSize: 15,
+                fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+          ]),
+          const SizedBox(height: 8),
+          ...early.map((b) => _timingRow(b, 'Early check-in',
+              formatStayTime(b['earlyCheckInTime']), const Color(0xFF16A34A), Icons.login_rounded)),
+          ...late.map((b) => _timingRow(b, 'Late check-out',
+              formatStayTime(b['lateCheckOutTime']), const Color(0xFFEA580C), Icons.logout_rounded)),
+        ]),
+      ),
+    );
+  }
+
+  Widget _timingRow(Map<String, dynamic> b, String label, String? time, Color color, IconData icon) {
+    final rooms = b['rooms'] as List?;
+    final roomText = (rooms != null && rooms.isNotEmpty)
+        ? rooms.map((r) => r['roomNumber'].toString()).join(', ')
+        : (b['roomNumber']?.toString() ?? '');
+    final guest = (b['guestName'] as String?)?.trim() ?? '';
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            '${guest.isEmpty ? 'Guest' : guest}${roomText.isEmpty ? '' : ' · Room $roomText'}',
+            style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B)),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text('$label · ${time ?? 'time not set'}',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
+        ),
+      ]),
+    );
+  }
+
   Widget _mealCard(String label, int pax, IconData icon, Color color) => Expanded(
     child: Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
@@ -693,69 +929,210 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   // ── Quick actions ─────────────────────────────────────────────────────────
 
+  /// The four the front desk uses all day — these get the bottom bar slots.
+  static final List<_QuickAction> _primaryActions = [
+    _QuickAction('New Booking', Icons.add_circle_rounded, const Color(0xFF4F46E5),
+        () => RoomSelectionScreen()),
+    _QuickAction('Bookings', Icons.calendar_month_rounded, const Color(0xFF16A34A),
+        () => ViewBookingsScreen()),
+    _QuickAction('Invoice', Icons.receipt_long_rounded, const Color(0xFFEF4444),
+        () => GenerateInvoiceScreen()),
+    _QuickAction('Inventory', Icons.inventory_2_rounded, const Color(0xFFF59E0B),
+        () => AddInventoryItemScreen()),
+  ];
+
+  /// Everything else — behind "More" on phones, in the grid on desktop.
+  static final List<_QuickAction> _moreActions = [
+    _QuickAction('Guests', Icons.people_alt_rounded, const Color(0xFFDB2777),
+        () => const GuestsListScreen()),
+    _QuickAction('Profit', Icons.analytics_rounded, const Color(0xFF8B5CF6),
+        () => CalculateProfitPage()),
+    _QuickAction('Expenses', Icons.attach_money_rounded, const Color(0xFF0891B2),
+        () => ExpensesAndSalaryScreen()),
+    _QuickAction('Room Config', Icons.meeting_room_rounded, const Color(0xFF475569),
+        () => RoomConfigScreen()),
+  ];
+
+  /// Managing who can sign in is owner-only, so this tile is added at build
+  /// time rather than living in the static list. The backend enforces the same
+  /// rule — hiding it here is convenience, not the control.
+  static final _userAccessAction = _QuickAction(
+      'User Access', Icons.admin_panel_settings_rounded, const Color(0xFF0F766E),
+      () => const UserAccessScreen());
+
+  List<_QuickAction> get _visibleMoreActions => [
+        ..._moreActions,
+        if (CurrentUser.current?.isAdmin == true) _userAccessAction,
+      ];
+
+  // Refreshes on return, so anything booked/edited there shows up right away
+  // instead of waiting for the next auto-refresh tick.
+  Future<void> _open(_QuickAction a) async {
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => a.builder()));
+    if (mounted) await _fetchData(silent: true);
+  }
+
   Widget _quickActions() {
+    final actions = [..._primaryActions, ..._visibleMoreActions];
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('Quick Actions',
             style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
         const SizedBox(height: 12),
-        GridView.count(
-          crossAxisCount: 4,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 10,
-          childAspectRatio: 0.85,
-          children: [
-            _actionTile('New\nBooking',  Icons.add_circle_rounded,    const Color(0xFF4F46E5),
-                () => Navigator.push(context, MaterialPageRoute(builder: (_) => RoomSelectionScreen()))),
-            _actionTile('Bookings',      Icons.calendar_month_rounded, const Color(0xFF16A34A),
-                () => Navigator.push(context, MaterialPageRoute(builder: (_) => ViewBookingsScreen()))),
-            _actionTile('Guests',        Icons.people_alt_rounded,     const Color(0xFFDB2777),
-                () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GuestsListScreen()))),
-            _actionTile('Inventory',     Icons.inventory_2_rounded,    const Color(0xFFF59E0B),
-                () => Navigator.push(context, MaterialPageRoute(builder: (_) => AddInventoryItemScreen()))),
-            _actionTile('Profit',        Icons.analytics_rounded,      const Color(0xFF8B5CF6),
-                () => Navigator.push(context, MaterialPageRoute(builder: (_) => CalculateProfitPage()))),
-            _actionTile('Invoice',       Icons.receipt_long_rounded,   const Color(0xFFEF4444),
-                () => Navigator.push(context, MaterialPageRoute(builder: (_) => GenerateInvoiceScreen()))),
-            _actionTile('Expenses',      Icons.attach_money_rounded,   const Color(0xFF0891B2),
-                () => Navigator.push(context, MaterialPageRoute(builder: (_) => ExpensesAndSalaryScreen()))),
-            _actionTile('Room\nConfig',  Icons.meeting_room_rounded,   const Color(0xFF475569),
-                () => Navigator.push(context, MaterialPageRoute(builder: (_) => RoomConfigScreen()))),
-          ],
-        ),
+        LayoutBuilder(builder: (context, c) {
+          const gap = 10.0;
+          // Aim for ~100px tiles, capped at 4 columns so the 8 actions stay in a
+          // tidy block instead of stretching into one long row on desktop.
+          final cols = ((c.maxWidth + gap) / 100).floor().clamp(2, 4);
+          final tileW = (c.maxWidth - gap * (cols - 1)) / cols;
+          return Wrap(
+            spacing: gap,
+            runSpacing: gap,
+            children: actions
+                .map((a) => SizedBox(width: tileW, height: 96, child: _actionTile(a)))
+                .toList(),
+          );
+        }),
       ]),
     );
   }
 
-  Widget _actionTile(String label, IconData icon, Color color, VoidCallback onTap) =>
-      GestureDetector(
-        onTap: onTap,
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 6, offset: const Offset(0, 2))],
-          ),
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Container(
-              width: 42, height: 42,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
+  Widget _actionTile(_QuickAction a) => Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        elevation: 1,
+        shadowColor: Colors.black.withValues(alpha: 0.18),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => _open(a),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: a.color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: Icon(a.icon, color: a.color, size: 23),
               ),
-              child: Icon(icon, color: color, size: 22),
-            ),
-            const SizedBox(height: 6),
-            Text(label,
-                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600,
-                    color: Color(0xFF334155)),
-                textAlign: TextAlign.center, maxLines: 2,
-                overflow: TextOverflow.ellipsis),
-          ]),
+              const SizedBox(height: 8),
+              Text(a.label,
+                  style: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF334155),
+                      height: 1.1),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis),
+            ]),
+          ),
         ),
       );
+
+  // ── Bottom action bar (phones) ─────────────────────────────────────────────
+
+  Widget _bottomBar() => Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 12, offset: const Offset(0, -2))],
+        ),
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            height: 62,
+            child: Row(
+              children: [
+                ..._primaryActions.map((a) => _bottomBarItem(
+                    a.label, a.icon, a.color, () => _open(a))),
+                _bottomBarItem('More', Icons.grid_view_rounded,
+                    const Color(0xFF64748B), _showMoreSheet),
+              ],
+            ),
+          ),
+        ),
+      );
+
+  Widget _bottomBarItem(String label, IconData icon, Color color, VoidCallback onTap) =>
+      Expanded(
+        child: InkWell(
+          onTap: onTap,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: color, size: 23),
+              const SizedBox(height: 3),
+              Text(label,
+                  style: TextStyle(
+                      fontSize: 10, fontWeight: FontWeight.w600, color: color),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
+            ],
+          ),
+        ),
+      );
+
+  void _showMoreSheet() => showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (sheetCtx) => SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40, height: 4,
+                  margin: const EdgeInsets.only(top: 10, bottom: 14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFCBD5E1),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 0, 20, 6),
+                child: Text('More',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold,
+                        color: Color(0xFF1E293B))),
+              ),
+              ..._visibleMoreActions.map((a) => ListTile(
+                    leading: Container(
+                      width: 40, height: 40,
+                      decoration: BoxDecoration(
+                        color: a.color.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(a.icon, color: a.color, size: 21),
+                    ),
+                    title: Text(a.label,
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600,
+                            color: Color(0xFF334155))),
+                    trailing: const Icon(Icons.chevron_right_rounded,
+                        color: Color(0xFF94A3B8)),
+                    onTap: () {
+                      Navigator.pop(sheetCtx);
+                      _open(a);
+                    },
+                  )),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      );
+}
+
+class _QuickAction {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final Widget Function() builder;
+  const _QuickAction(this.label, this.icon, this.color, this.builder);
 }

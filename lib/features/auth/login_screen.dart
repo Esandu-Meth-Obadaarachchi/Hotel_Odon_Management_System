@@ -30,16 +30,17 @@ class _LoginScreenState extends State<LoginScreen> {
       final cred = await FirebaseAuth.instance.signInWithPopup(provider);
       final email = cred.user?.email;
 
-      if (!isAllowedEmail(email)) {
-        // Wrong account — kick them straight back out so no session lingers.
-        await FirebaseAuth.instance.signOut();
-        if (!mounted) return;
-        setState(() {
-          _error = '${email ?? 'That account'} is not authorised to access '
-              'this dashboard.';
-        });
-      }
-      // On success the AuthGate stream rebuilds and routes to HomeScreen.
+      // Logged so a near-miss (extra dot, googlemail.com, wrong account picked)
+      // is visible in the console rather than looking like a silent failure.
+      debugPrint('[auth] signed in as "$email"');
+
+      // Deliberately no allow-list check here. The server owns that decision,
+      // and AuthGate asks it — checking a hardcoded copy at this point would
+      // sign out anyone granted access from the User Access screen before the
+      // server was ever consulted. Refusals are shown by the access screen,
+      // which offers a sign-out.
+      if (!mounted) return;
+      setState(() {}); // nudge a rebuild in case the auth stream is slow
     } on FirebaseAuthException catch (e) {
       if (e.code == 'popup-closed-by-user' ||
           e.code == 'cancelled-popup-request') {

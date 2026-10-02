@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:odon_booking/core/api/api_service.dart';
+import 'package:odon_booking/features/bookings/head_count.dart';
 import 'package:odon_booking/features/invoices/booking_invoice.dart';
 import 'edit_booking_screen.dart';
 import 'future_bookings_screen.dart';
 import 'past_bookings_screen.dart';
 import 'selected_day_booking.dart';
+import 'package:odon_booking/features/bookings/widgets/booking_flags.dart';
+import 'package:odon_booking/features/bookings/widgets/extra_charges.dart';
 
 class ViewBookingsScreen extends StatefulWidget {
   @override
@@ -52,24 +55,59 @@ class _ViewBookingsScreenState extends State<ViewBookingsScreen> {
     );
   }
 
+  // Every night a booking occupies: check-in night through the night before
+  // check-out. A 14th → 16th stay occupies the 14th and the 15th.
+  List<DateTime> _nightsOf(DateTime checkIn, DateTime checkOut) {
+    final start = DateTime(checkIn.year, checkIn.month, checkIn.day);
+    final end = DateTime(checkOut.year, checkOut.month, checkOut.day);
+
+    // Day-use / bad data (check-out on or before check-in): still show it once.
+    if (!end.isAfter(start)) return [start];
+
+    final nights = <DateTime>[];
+    for (var i = 0; ; i++) {
+      final night = DateTime(start.year, start.month, start.day + i);
+      if (!night.isBefore(end)) break;
+      nights.add(night);
+    }
+    return nights;
+  }
+
   Future<void> _fetchMonthEvents() async {
     try {
       final bookings = await _apiService.fetchBookingsForMonth(_focusedDay);
       final Map<DateTime, List> events = {};
       int totalRoomNights = 0;
 
+      int skipped = 0;
+
       for (final booking in bookings) {
-        final checkInDate = DateTime.parse(booking['checkIn']);
-        final checkOutDate = DateTime.parse(booking['checkOut']);
-        final nights = checkOutDate.difference(checkInDate).inDays;
+        // A record with a missing or malformed date must not take the whole
+        // calendar down with it — skip it and carry on.
+        final checkInDate = DateTime.tryParse(booking['checkIn']?.toString() ?? '');
+        final checkOutDate = DateTime.tryParse(booking['checkOut']?.toString() ?? '');
+        if (checkInDate == null || checkOutDate == null) {
+          skipped++;
+          continue;
+        }
+
         final rooms = _roomCount(booking);
+        final nights = _nightsOf(checkInDate, checkOutDate);
 
         if (checkInDate.month == _focusedDay.month && checkInDate.year == _focusedDay.year) {
-          totalRoomNights += nights * rooms;
-
-          final dayKey = DateTime(checkInDate.year, checkInDate.month, checkInDate.day);
-          events[dayKey] = [...(events[dayKey] ?? []), booking];
+          totalRoomNights += nights.length * rooms;
         }
+
+        // A booking belongs to every night it occupies, not just its check-in
+        // day — otherwise a multi-night stay looks like a free day mid-stay.
+        for (final night in nights) {
+          if (night.month != _focusedDay.month || night.year != _focusedDay.year) continue;
+          events[night] = [...(events[night] ?? []), booking];
+        }
+      }
+
+      if (skipped > 0) {
+        print('Skipped $skipped booking(s) with an unreadable check-in/out date');
       }
 
       setState(() {
@@ -359,7 +397,7 @@ class _ViewBookingsScreenState extends State<ViewBookingsScreen> {
             Icon(Icons.event_available, size: 56, color: Colors.grey.shade300),
             const SizedBox(height: 12),
             Text(
-              _selectedDay == null ? 'Tap a date to view bookings' : 'No check-ins on this day',
+              _selectedDay == null ? 'Tap a date to view bookings' : 'No bookings on this day',
               style: TextStyle(fontSize: 15, color: Colors.grey.shade500),
             ),
           ],
@@ -379,6 +417,7 @@ class _ViewBookingsScreenState extends State<ViewBookingsScreen> {
     final guestPhone = booking['guestPhone'] as String? ?? '';
     final package = booking['package'] as String? ?? 'N/A';
     final extraDetails = (booking['extraDetails'] as String?)?.trim() ?? '';
+    final extraCharges = extraChargesOf(booking);
     final numOfNights = booking['num_of_nights']?.toString() ?? 'N/A';
     final total = booking['total'] as String? ?? '';
     final advance = booking['advance'] as String? ?? '';
@@ -386,7 +425,11 @@ class _ViewBookingsScreenState extends State<ViewBookingsScreen> {
     final checkIn = booking['checkIn'] != null ? DateTime.parse(booking['checkIn']) : null;
     final checkOut = booking['checkOut'] != null ? DateTime.parse(booking['checkOut']) : null;
 
+    final stayStatus = _stayStatus(checkIn, checkOut);
+    final auditLine = _auditLine(booking);
+
     final needDriver = booking['needDriver'] == true;
+    final headCount = headCountOf(booking);
     final isNewFormat = booking['rooms'] != null && (booking['rooms'] as List).isNotEmpty;
     final rooms = isNewFormat
         ? List<Map<String, dynamic>>.from((booking['rooms'] as List).map((r) => Map<String, dynamic>.from(r)))
@@ -478,6 +521,12 @@ class _ViewBookingsScreenState extends State<ViewBookingsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // ── Which night of the stay this day is ──────────────────────
+                if (stayStatus != null) ...[
+                  stayStatus,
+                  const SizedBox(height: 10),
+                ],
+
                 // ── Rooms ────────────────────────────────────────────────────
                 if (isNewFormat) ...[
                   const Text('Rooms', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey)),
@@ -499,6 +548,8 @@ class _ViewBookingsScreenState extends State<ViewBookingsScreen> {
                     ],
                   ),
                 ],
+
+                BookingFlagBadges(booking: booking),
 
                 if (needDriver) ...[
                   const SizedBox(height: 8),
@@ -541,6 +592,13 @@ class _ViewBookingsScreenState extends State<ViewBookingsScreen> {
                     Expanded(child: _detailItem(Icons.logout, 'Check-out', _fmtDate(checkOut), Colors.red)),
                   ],
                 ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(child: _detailItem(Icons.person_outline, 'Adults', '${headCount.adults}', Colors.blueGrey)),
+                    Expanded(child: _detailItem(Icons.child_care, 'Kids', '${headCount.kids}', Colors.pink)),
+                  ],
+                ),
 
                 // ── Financial ────────────────────────────────────────────────
                 if (total.isNotEmpty || advance.isNotEmpty) ...[
@@ -553,6 +611,11 @@ class _ViewBookingsScreenState extends State<ViewBookingsScreen> {
                         Expanded(child: _detailItem(Icons.payments, 'Advance', 'LKR $advance', Colors.orange)),
                     ],
                   ),
+                ],
+
+                if (extraCharges.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  ExtraChargesSummary(charges: extraCharges),
                 ],
 
                 // ── Extra details ─────────────────────────────────────────────
@@ -581,9 +644,99 @@ class _ViewBookingsScreenState extends State<ViewBookingsScreen> {
                     ),
                   ),
                 ],
+
+                // ── Who entered / last edited this ────────────────────────────
+                if (auditLine != null) auditLine,
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  /// "Added by dad · Edited by esandu, 14 Aug" — from the server-stamped
+  /// fields. Returns null for records created before the audit trail existed.
+  Widget? _auditLine(Map<String, dynamic> booking) {
+    final createdBy = (booking['createdBy'] as String?)?.trim() ?? '';
+    final updatedBy = (booking['updatedBy'] as String?)?.trim() ?? '';
+    if (createdBy.isEmpty && updatedBy.isEmpty) return null;
+
+    String who(String email, String name) {
+      final n = name.trim();
+      if (n.isNotEmpty) return n.split(' ').first;
+      return email.split('@').first;
+    }
+
+    final parts = <String>[];
+    if (createdBy.isNotEmpty) {
+      parts.add('Added by ${who(createdBy, booking['createdByName'] as String? ?? '')}');
+    }
+    // Only worth showing the editor when it is a genuine later edit.
+    final updatedAt = DateTime.tryParse(booking['updatedAt'] as String? ?? '');
+    final createdAt = DateTime.tryParse(booking['createdAt'] as String? ?? '');
+    final wasEdited = updatedAt != null &&
+        (createdAt == null || updatedAt.difference(createdAt).inSeconds > 5);
+    if (updatedBy.isNotEmpty && wasEdited) {
+      final label = who(updatedBy, booking['updatedByName'] as String? ?? '');
+      parts.add('edited by $label ${_fmtDate(updatedAt)}');
+    }
+    if (parts.isEmpty) return null;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Row(
+        children: [
+          Icon(Icons.history, size: 12, color: Colors.grey.shade400),
+          const SizedBox(width: 5),
+          Expanded(
+            child: Text(
+              parts.join(' · '),
+              style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Shows whether the selected day is the check-in night or a later night of
+  // the same stay, e.g. "Staying over · Night 2 of 2".
+  Widget? _stayStatus(DateTime? checkIn, DateTime? checkOut) {
+    final selected = _selectedDay;
+    if (selected == null || checkIn == null || checkOut == null) return null;
+
+    final nights = _nightsOf(checkIn, checkOut);
+    final day = DateTime(selected.year, selected.month, selected.day);
+    final index = nights.indexWhere((n) => isSameDay(n, day));
+    if (index < 0) return null;
+
+    final isCheckIn = index == 0;
+    final label = isCheckIn ? 'Check-in' : 'Staying over';
+    final color = isCheckIn ? Colors.green.shade700 : Colors.blue.shade700;
+    final icon = isCheckIn ? Icons.login : Icons.hotel;
+    final nightLabel = nights.length == 1
+        ? '1 night'
+        : 'Night ${index + 1} of ${nights.length}';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color)),
+          const SizedBox(width: 6),
+          Text('·', style: TextStyle(fontSize: 12, color: color.withValues(alpha: 0.6))),
+          const SizedBox(width: 6),
+          Text(nightLabel, style: TextStyle(fontSize: 12, color: color.withValues(alpha: 0.85))),
         ],
       ),
     );

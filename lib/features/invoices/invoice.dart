@@ -10,6 +10,10 @@ Future<String?> generateInvoice({
   required String checkIn,
   required String checkOut,
   required int numGuests,
+  /// Children in the party. They are tracked separately from [numGuests]
+  /// because a room is picked on its adult capacity — kids never enter into
+  /// it — so the invoice has to name them explicitly or they read as adults.
+  int numKids = 0,
   required String room,
   required String packageDetails,
   String? startMeal, // New optional parameter for starting meal
@@ -156,7 +160,9 @@ Future<String?> generateInvoice({
                         style: pw.TextStyle(font: defaultFont, fontSize: 12),
                       ),
                       pw.Text(
-                        "No. of Guests: $numGuests",
+                        numKids > 0
+                            ? "No. of Guests: $numGuests adult${numGuests == 1 ? '' : 's'} + $numKids kid${numKids == 1 ? '' : 's'}"
+                            : "No. of Guests: $numGuests",
                         style: pw.TextStyle(font: defaultFont, fontSize: 12),
                       ),
                       pw.Text(
