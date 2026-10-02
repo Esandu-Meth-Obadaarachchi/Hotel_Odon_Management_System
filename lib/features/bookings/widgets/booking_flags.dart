@@ -193,7 +193,7 @@ class OptionToggleCard extends StatelessWidget {
                     scale: 0.9,
                     child: Switch(
                       value: value,
-                      activeThumbColor: color.shade700,
+                      activeColor: color.shade700,
                       onChanged: onChanged,
                     ),
                   ),
