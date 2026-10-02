@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:odon_booking/core/api/api_service.dart';
 import 'package:odon_booking/features/guests/widgets/guest_name_autocomplete.dart';
+import 'widgets/room_picker.dart';
 
 class EditBookingScreen extends StatefulWidget {
   final Map<String, dynamic> booking;
@@ -24,20 +25,24 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
   late TextEditingController adultsController;
   late TextEditingController kidsController;
 
-  // Legacy fields (old single-room bookings)
-  late TextEditingController roomNumberController;
-  late TextEditingController roomTypeController;
+  // Room selection, picked on the same grid as Add Booking. Legacy
+  // single-room bookings load into it too and are saved back in the
+  // multi-room format.
+  List<Map<String, dynamic>> _roomConfig = [];
+  bool _configLoading = true;
+  final Set<String> _selectedRooms = {};
+  final Set<String> _extraBedRooms = {};
+  Set<String> _bookedRooms = {};
 
-  // New: per-room list (new multi-room bookings)
-  late List<Map<String, dynamic>> _rooms;
-  late bool _isNewFormat;
+  /// Rooms on the booking that are missing from the room config (renamed or
+  /// removed since). They are kept as they were so an edit never drops them.
+  final Map<String, Map<String, dynamic>> _unlistedRooms = {};
 
   String _balanceMethod = '';
   String _balanceDisplay = 'N/A';
   String? _mealStart;
   bool _needDriver = false;
 
-  static const _roomTypes = ['Double', 'Triple', 'Family', 'Family Plus'];
   static const _packages = ['Full Board', 'Half Board', 'Room Only', 'BnB', 'Dinner Only'];
   static const _mealStarts = ['Lunch', 'Dinner'];
 
@@ -46,15 +51,22 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
     super.initState();
     final b = widget.booking;
 
-    _isNewFormat = b['rooms'] != null && (b['rooms'] as List).isNotEmpty;
-    _rooms = _isNewFormat
-        ? List<Map<String, dynamic>>.from(
-            (b['rooms'] as List).map((r) => Map<String, dynamic>.from(r)),
-          )
-        : [];
-
-    roomNumberController = TextEditingController(text: b['roomNumber'] as String? ?? '');
-    roomTypeController = TextEditingController(text: b['roomType'] as String? ?? '');
+    final isNewFormat = b['rooms'] is List && (b['rooms'] as List).isNotEmpty;
+    final List<Map<String, dynamic>> initialRooms = isNewFormat
+        ? (b['rooms'] as List).map((r) => Map<String, dynamic>.from(r)).toList()
+        : [
+            if ((b['roomNumber'] ?? '').toString().trim().isNotEmpty)
+              {
+                'roomNumber': b['roomNumber'].toString().trim(),
+                'roomType': b['roomType'] ?? 'Double',
+              },
+          ];
+    for (final r in initialRooms) {
+      final roomNum = r['roomNumber'].toString();
+      _selectedRooms.add(roomNum);
+      if (hasExtraBed((r['roomType'] ?? '').toString())) _extraBedRooms.add(roomNum);
+    }
+    _initialRooms = initialRooms;
     packageTypeController = TextEditingController(text: b['package'] as String? ?? '');
     extraDetailsController = TextEditingController(text: b['extraDetails'] as String? ?? '');
     totalController = TextEditingController(text: b['total'] as String? ?? '');
@@ -84,6 +96,84 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
     totalController.addListener(_recalcBalance);
     advanceController.addListener(_recalcBalance);
     _recalcBalance();
+
+    _loadRooms();
+  }
+
+  late final List<Map<String, dynamic>> _initialRooms;
+
+  DateTime get _checkIn => DateTime.parse(widget.booking['checkIn'].toString());
+  DateTime get _checkOut => DateTime.parse(widget.booking['checkOut'].toString());
+
+  Future<void> _loadRooms() async {
+    try {
+      final config = await _apiService.fetchRoomConfig();
+      final rooms = List<Map<String, dynamic>>.from(
+        (config['rooms'] as List).map((r) => Map<String, dynamic>.from(r)),
+      );
+      final known = rooms.map((r) => r['roomNumber'].toString()).toSet();
+      setState(() {
+        _roomConfig = rooms;
+        for (final r in _initialRooms) {
+          final roomNum = r['roomNumber'].toString();
+          if (!known.contains(roomNum)) _unlistedRooms[roomNum] = r;
+        }
+        _configLoading = false;
+      });
+    } catch (e) {
+      setState(() => _configLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load room config: $e')),
+        );
+      }
+    }
+    await _refreshBookedRooms();
+  }
+
+  /// Rooms other bookings hold on this booking's dates.
+  Future<Set<String>> _fetchBookedRooms(DateTime checkIn, DateTime checkOut) async {
+    final bookings = await _apiService.fetchBookingsForDateRange(checkIn, checkOut);
+    return bookedRoomsBetween(
+      bookings,
+      checkIn,
+      checkOut,
+      excludeId: widget.booking['_id'] as String?,
+    );
+  }
+
+  Future<void> _refreshBookedRooms() async {
+    try {
+      final booked = await _fetchBookedRooms(_checkIn, _checkOut);
+      if (mounted) setState(() => _bookedRooms = booked);
+    } catch (_) {
+      // The grid still works without it; save re-checks availability anyway.
+    }
+  }
+
+  /// Rooms as they will be saved: one entry per selected room, typed from the
+  /// room config plus the extra-bed toggle.
+  List<Map<String, dynamic>> get _roomsData {
+    final list = <Map<String, dynamic>>[];
+    for (final roomNum in _selectedRooms) {
+      final cfg = _roomConfig.firstWhere(
+        (r) => r['roomNumber'].toString() == roomNum,
+        orElse: () => <String, dynamic>{},
+      );
+      if (cfg.isEmpty) {
+        final kept = _unlistedRooms[roomNum] ??
+            _initialRooms.firstWhere(
+              (r) => r['roomNumber'].toString() == roomNum,
+              orElse: () => {'roomNumber': roomNum, 'roomType': 'Double'},
+            );
+        final type = (kept['roomType'] ?? 'Double').toString();
+        list.add({'roomNumber': roomNum, 'roomType': type, 'pax': paxForType(type)});
+        continue;
+      }
+      final type = effectiveRoomType(cfg, extraBed: _extraBedRooms.contains(roomNum));
+      list.add({'roomNumber': roomNum, 'roomType': type, 'pax': paxForType(type)});
+    }
+    return list;
   }
 
   @override
@@ -96,8 +186,6 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
     extraDetailsController.dispose();
     guestNameController.dispose();
     guestPhoneController.dispose();
-    roomNumberController.dispose();
-    roomTypeController.dispose();
     adultsController.dispose();
     kidsController.dispose();
     super.dispose();
@@ -110,22 +198,17 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
   }
 
   Future<void> _save() async {
-    if (_isNewFormat) {
-      if (packageTypeController.text.trim().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please fill in all required fields')),
-        );
-        return;
-      }
-    } else {
-      if (roomNumberController.text.isEmpty ||
-          roomTypeController.text.isEmpty ||
-          packageTypeController.text.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please fill in all required fields')),
-        );
-        return;
-      }
+    if (packageTypeController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill in all required fields')),
+      );
+      return;
+    }
+    if (_selectedRooms.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select at least one room')),
+      );
+      return;
     }
 
     final updatedBooking = {
@@ -145,11 +228,11 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
       'numAdults': int.tryParse(adultsController.text.trim()) ?? _roomCapacity,
       'numKids': int.tryParse(kidsController.text.trim()) ?? 0,
       if (_mealStart != null) 'mealStart': _mealStart,
-      // Legacy fields
-      if (!_isNewFormat) 'roomNumber': roomNumberController.text,
-      if (!_isNewFormat) 'roomType': roomTypeController.text,
-      // New fields
-      if (_isNewFormat) 'rooms': _rooms,
+      'rooms': _roomsData,
+      // Clears the old single-room fields so a converted legacy booking is
+      // read in the multi-room format everywhere.
+      'roomNumber': null,
+      'roomType': null,
     };
 
     try {
@@ -220,18 +303,35 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
             _buildField('Guest Phone', guestPhoneController, icon: Icons.phone),
             const SizedBox(height: 15),
 
-            // Rooms section — new format shows per-room type editors, legacy shows text fields
-            if (_isNewFormat) ...[
-              const Text('Rooms', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.indigo)),
-              const SizedBox(height: 8),
-              ..._rooms.asMap().entries.map((entry) => _buildRoomRow(entry.key, entry.value)),
-              const SizedBox(height: 15),
-            ] else ...[
-              _buildField('Room Number', roomNumberController, icon: Icons.hotel),
-              const SizedBox(height: 15),
-              _buildField('Room Type', roomTypeController, icon: Icons.room_preferences),
-              const SizedBox(height: 15),
-            ],
+            // Rooms — same grid as Add Booking
+            const Text('Rooms', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.indigo)),
+            const SizedBox(height: 8),
+            if (_configLoading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(child: CircularProgressIndicator(color: Colors.indigo)),
+              )
+            else
+              RoomPicker(
+                roomConfig: _roomConfig,
+                selectedRooms: _selectedRooms,
+                extraBedRooms: _extraBedRooms,
+                bookedRooms: _bookedRooms,
+                onToggleRoom: (roomNum) => setState(() {
+                  if (!_selectedRooms.remove(roomNum)) {
+                    _selectedRooms.add(roomNum);
+                  } else {
+                    _extraBedRooms.remove(roomNum);
+                    _unlistedRooms.remove(roomNum);
+                  }
+                }),
+                onToggleExtraBed: (roomNum) => setState(() {
+                  if (!_extraBedRooms.remove(roomNum)) _extraBedRooms.add(roomNum);
+                }),
+              ),
+            const SizedBox(height: 10),
+            _buildSelectedRoomsSummary(),
+            const SizedBox(height: 15),
 
             // Head count — adults defaults to the rooms' capacity, kids are
             // recorded by hand because they never affect the room chosen.
@@ -360,84 +460,62 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
     );
   }
 
-  Widget _buildRoomRow(int index, Map<String, dynamic> room) {
-    final currentType = room['roomType'] as String? ?? 'Double';
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Row(
-          children: [
-            Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                color: Colors.indigo.shade50,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Center(
-                child: Text(
-                  (room['roomNumber'] ?? '').toString().padLeft(3, '0'),
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.indigo),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: DropdownButtonFormField<String>(
-                value: _roomTypes.contains(currentType) ? currentType : null,
-                decoration: InputDecoration(
-                  labelText: 'Room Type',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                ),
-                items: _roomTypes.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
-                onChanged: (v) {
-                  if (v != null) {
-                    setState(() {
-                      _rooms[index]['roomType'] = v;
-                      _rooms[index]['pax'] = _paxForType(v);
-                    });
-                  }
-                },
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              '${_paxForType(currentType)}pax',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  int _paxForType(String type) {
-    switch (type) {
-      case 'Double': return 2;
-      case 'Triple': return 3;
-      case 'Family': return 4;
-      case 'Family Plus': return 5;
-      default: return 2;
+  Widget _buildSelectedRoomsSummary() {
+    final rooms = _roomsData;
+    if (rooms.isEmpty) {
+      return Text(
+        'No rooms selected. Tap a room to add it.',
+        style: TextStyle(fontSize: 12, color: Colors.red.shade400),
+      );
     }
+    final unlisted = rooms.where((r) => _unlistedRooms.containsKey(r['roomNumber'])).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          children: rooms.map((r) {
+            final isUnlisted = _unlistedRooms.containsKey(r['roomNumber']);
+            return InputChip(
+              label: Text(
+                'Room ${r['roomNumber'].toString().padLeft(3, '0')} · ${r['roomType']} · ${r['pax']}pax',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.green.shade800),
+              ),
+              backgroundColor: Colors.green.shade50,
+              side: BorderSide(color: Colors.green.shade300),
+              // Unlisted rooms are not on the grid, so this is the only way
+              // to drop them.
+              onDeleted: isUnlisted
+                  ? () => setState(() {
+                        _selectedRooms.remove(r['roomNumber']);
+                        _unlistedRooms.remove(r['roomNumber']);
+                      })
+                  : null,
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          unlisted.isEmpty
+              ? 'Tap + on a selected room to add an extra bed'
+              : 'Rooms not in the current room setup are kept as they were.',
+          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+        ),
+      ],
+    );
   }
 
   /// Combined capacity of this booking's rooms, across both the new per-room
   /// list and the legacy single-room fields. Used only as the fallback for a
   /// booking that predates the stored head count.
-  int get _roomCapacity {
-    if (_isNewFormat) {
-      return _rooms.fold<int>(0, (sum, r) {
+  int get _roomCapacity => _initialRooms.fold<int>(0, (sum, r) {
         final pax = r['pax'];
         return sum +
             (pax is num && pax > 0
                 ? pax.toInt()
-                : _paxForType((r['roomType'] ?? '').toString()));
+                : paxForType((r['roomType'] ?? '').toString()));
       });
-    }
-    return _paxForType(roomTypeController.text);
-  }
 
   Widget _buildField(String label, TextEditingController controller,
       {IconData? icon, int maxLines = 1, TextInputType? keyboardType}) {

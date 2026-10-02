@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:odon_booking/core/api/api_service.dart';
 import 'package:odon_booking/features/guests/widgets/guest_name_autocomplete.dart';
+import 'widgets/room_picker.dart';
 
 class RoomSelectionScreen extends StatefulWidget {
   /// Optional prefill data (e.g. coming from the Generate Invoice screen).
@@ -116,22 +117,12 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
     }
   }
 
-  String _getRoomType(Map<String, dynamic> roomCfg) {
-    final baseType = roomCfg['baseType'] as String;
-    final hasExtra = _extraBedRooms.contains(roomCfg['roomNumber'] as String);
-    if (baseType == 'Family') return hasExtra ? 'Family Plus' : 'Family';
-    return hasExtra ? 'Triple' : 'Double';
-  }
+  String _getRoomType(Map<String, dynamic> roomCfg) => effectiveRoomType(
+        roomCfg,
+        extraBed: _extraBedRooms.contains(roomCfg['roomNumber'] as String),
+      );
 
-  int _getPax(String roomType) {
-    switch (roomType) {
-      case 'Double': return 2;
-      case 'Triple': return 3;
-      case 'Family': return 4;
-      case 'Family Plus': return 5;
-      default: return 2;
-    }
-  }
+  int _getPax(String roomType) => paxForType(roomType);
 
   /// Combined capacity of the rooms currently selected. This is the number the
   /// adults box starts from, because the room chosen is what implies the head
@@ -214,29 +205,27 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
     if (_checkInDate == null || _checkOutDate == null) return;
     try {
       final bookings = await _apiService.fetchBookingsForDateRange(_checkInDate!, _checkOutDate!);
-      final booked = <String>{};
-      for (final booking in bookings) {
-        final bookingCheckIn = DateTime.parse(booking['checkIn']);
-        final bookingCheckOut = DateTime.parse(booking['checkOut']);
-        final normBI = DateTime(bookingCheckIn.year, bookingCheckIn.month, bookingCheckIn.day);
-        final normBO = DateTime(bookingCheckOut.year, bookingCheckOut.month, bookingCheckOut.day);
-        final normCI = DateTime(_checkInDate!.year, _checkInDate!.month, _checkInDate!.day);
-        final normCO = DateTime(_checkOutDate!.year, _checkOutDate!.month, _checkOutDate!.day);
-
-        bool overlaps = normCI.isBefore(normBO) && normCO.isAfter(normBI);
-        if (normCI.isAtSameMomentAs(normBO)) overlaps = false;
-
-        if (overlaps) {
-          if (booking['rooms'] != null && (booking['rooms'] as List).isNotEmpty) {
-            for (final r in booking['rooms'] as List) {
-              booked.add(r['roomNumber'].toString());
-            }
-          } else if (booking['roomNumber'] != null) {
-            booked.add(booking['roomNumber'].toString());
-          }
-        }
+      final booked = bookedRoomsBetween(bookings, _checkInDate!, _checkOutDate!);
+      // Rooms picked before the dates changed may now be taken.
+      final clashing = _selectedRooms.intersection(booked);
+      setState(() {
+        _bookedRooms = booked;
+        _selectedRooms.removeAll(clashing);
+        _extraBedRooms.removeAll(clashing);
+        _syncAdults();
+      });
+      if (clashing.isNotEmpty && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Room${clashing.length > 1 ? 's' : ''} ${clashing.join(', ')} '
+              '${clashing.length > 1 ? 'are' : 'is'} booked on these dates and '
+              '${clashing.length > 1 ? 'were' : 'was'} unselected. Please pick again.',
+            ),
+            backgroundColor: Colors.orange.shade700,
+          ),
+        );
       }
-      setState(() => _bookedRooms = booked);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Failed to fetch existing bookings')),
@@ -420,236 +409,6 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
     _adultsController.dispose();
     _kidsController.dispose();
     super.dispose();
-  }
-
-  // ─── Room card ───────────────────────────────────────────────────────────────
-
-  Widget _buildRoomCard(Map<String, dynamic> room) {
-    final roomNum = room['roomNumber'] as String;
-    final baseType = room['baseType'] as String;
-    final isBlocked = room['isBlocked'] == true;
-    final isBooked = _bookedRooms.contains(roomNum);
-    final isSelected = _selectedRooms.contains(roomNum);
-    final hasExtra = _extraBedRooms.contains(roomNum);
-
-    final roomType = isSelected ? _getRoomType(room) : baseType;
-    final pax = _getPax(roomType);
-
-    Color bgColor;
-    Color textColor = const Color(0xFF1E293B);
-
-    if (isBlocked) {
-      bgColor = Colors.grey.shade300;
-      textColor = Colors.grey.shade600;
-    } else if (isBooked) {
-      bgColor = Colors.red.shade400;
-      textColor = Colors.white;
-    } else if (isSelected && hasExtra) {
-      bgColor = Colors.orange.shade400;
-      textColor = Colors.white;
-    } else if (isSelected) {
-      bgColor = Colors.green.shade500;
-      textColor = Colors.white;
-    } else {
-      bgColor = Colors.white;
-    }
-
-    return GestureDetector(
-      onTap: (isBlocked || isBooked)
-          ? null
-          : () {
-              setState(() {
-                if (_selectedRooms.contains(roomNum)) {
-                  _selectedRooms.remove(roomNum);
-                  _extraBedRooms.remove(roomNum);
-                } else {
-                  _selectedRooms.add(roomNum);
-                }
-                _syncAdults();
-              });
-            },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected
-                ? (hasExtra ? Colors.orange.shade700 : Colors.green.shade700)
-                : Colors.grey.shade300,
-            width: isSelected ? 2 : 1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.07),
-              blurRadius: 5,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.all(4),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      roomNum.padLeft(3, '0'),
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                        color: textColor,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      isBlocked
-                          ? 'Blocked'
-                          : isBooked
-                              ? 'Booked'
-                              : (isSelected ? roomType : baseType),
-                      style: TextStyle(
-                        fontSize: 9,
-                        color: textColor.withValues(alpha: 0.9),
-                        fontWeight: FontWeight.w500,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    if (isSelected) ...[
-                      const SizedBox(height: 1),
-                      Text(
-                        '${pax}pax',
-                        style: TextStyle(
-                          fontSize: 9,
-                          color: textColor.withValues(alpha: 0.8),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-            if (isSelected && !isBlocked && !isBooked)
-              Positioned(
-                top: 3,
-                right: 3,
-                child: GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      if (_extraBedRooms.contains(roomNum)) {
-                        _extraBedRooms.remove(roomNum);
-                      } else {
-                        _extraBedRooms.add(roomNum);
-                      }
-                      _syncAdults();
-                    });
-                  },
-                  child: Container(
-                    width: 20,
-                    height: 20,
-                    decoration: BoxDecoration(
-                      color: hasExtra ? Colors.white : Colors.white.withValues(alpha: 0.6),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: hasExtra ? Colors.orange.shade700 : Colors.green.shade700,
-                        width: 1.5,
-                      ),
-                    ),
-                    child: Icon(
-                      Icons.add,
-                      size: 13,
-                      color: hasExtra ? Colors.orange.shade700 : Colors.green.shade700,
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFloorSection(String floor) {
-    final rooms = _roomConfig.where((r) => r['floor'] == floor).toList();
-    if (rooms.isEmpty) return const SizedBox.shrink();
-
-    final isGround = floor == 'Ground';
-
-    return Card(
-      elevation: 0,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Floor header
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: isGround ? Colors.indigo.shade50 : Colors.purple.shade50,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
-              border: Border(
-                bottom: BorderSide(
-                  color: isGround ? Colors.indigo.shade100 : Colors.purple.shade100,
-                ),
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: isGround ? Colors.indigo : Colors.purple,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '$floor Floor',
-                  style: TextStyle(
-                    fontFamily: 'Outfit',
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                    color: isGround ? Colors.indigo.shade700 : Colors.purple.shade700,
-                    letterSpacing: 0.3,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  '${rooms.length} rooms',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isGround ? Colors.indigo.shade400 : Colors.purple.shade400,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Room grid
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 4,
-                mainAxisSpacing: 10,
-                crossAxisSpacing: 10,
-                childAspectRatio: 0.9,
-              ),
-              itemCount: rooms.length,
-              itemBuilder: (context, index) => _buildRoomCard(rooms[index]),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   Widget _buildSelectedSummary() {
@@ -1105,13 +864,25 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                         // ── Room selection ────────────────────────────────
                         _sectionLabel('Select Rooms'),
                         const SizedBox(height: 10),
-                        _buildFloorSection('Ground'),
-                        const SizedBox(height: 10),
-                        _buildFloorSection('Upper'),
-                        const SizedBox(height: 12),
-
-                        // Legend
-                        _buildLegend(),
+                        RoomPicker(
+                          roomConfig: _roomConfig,
+                          selectedRooms: _selectedRooms,
+                          extraBedRooms: _extraBedRooms,
+                          bookedRooms: _bookedRooms,
+                          onToggleRoom: (roomNum) => setState(() {
+                            if (_selectedRooms.contains(roomNum)) {
+                              _selectedRooms.remove(roomNum);
+                              _extraBedRooms.remove(roomNum);
+                            } else {
+                              _selectedRooms.add(roomNum);
+                            }
+                            _syncAdults();
+                          }),
+                          onToggleExtraBed: (roomNum) => setState(() {
+                            if (!_extraBedRooms.remove(roomNum)) _extraBedRooms.add(roomNum);
+                            _syncAdults();
+                          }),
+                        ),
                         const SizedBox(height: 12),
 
                         // Selected summary
@@ -1332,39 +1103,6 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildLegend() {
-    return Wrap(
-      spacing: 10,
-      runSpacing: 6,
-      children: [
-        _legendChip(Colors.white, Colors.grey.shade400, 'Available'),
-        _legendChip(Colors.green.shade500, Colors.green.shade500, 'Selected'),
-        _legendChip(Colors.orange.shade400, Colors.orange.shade400, '+Extra bed'),
-        _legendChip(Colors.red.shade400, Colors.red.shade400, 'Booked'),
-        _legendChip(Colors.grey.shade300, Colors.grey.shade300, 'Blocked'),
-      ],
-    );
-  }
-
-  Widget _legendChip(Color fill, Color border, String label) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 12,
-          height: 12,
-          decoration: BoxDecoration(
-            color: fill,
-            borderRadius: BorderRadius.circular(3),
-            border: Border.all(color: border),
-          ),
-        ),
-        const SizedBox(width: 4),
-        Text(label, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
-      ],
     );
   }
 
