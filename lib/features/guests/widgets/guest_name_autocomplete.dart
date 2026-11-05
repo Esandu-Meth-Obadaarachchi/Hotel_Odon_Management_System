@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:odon_booking/shared/widgets/odon_ui.dart';
 import 'package:odon_booking/core/api/api_service.dart';
 
 /// Drop-in TextField for guest name with autocomplete suggestions backed by
@@ -28,7 +29,7 @@ class GuestNameAutocomplete extends StatefulWidget {
     this.label = 'Guest Name',
     this.inputDecoration,
     this.wrapperDecoration,
-    this.wrapperPadding = const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+    this.wrapperPadding = EdgeInsets.zero,
   });
 
   @override
@@ -70,18 +71,11 @@ class _GuestNameAutocompleteState extends State<GuestNameAutocomplete> {
           controller: controller,
           focusNode: focusNode,
           decoration: widget.inputDecoration ??
-              InputDecoration(border: InputBorder.none, labelText: widget.label),
+              fieldDecoration(widget.label, icon: Icons.person_outline_rounded),
         );
         return Container(
           padding: widget.wrapperPadding,
-          decoration: widget.wrapperDecoration ??
-              BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: [
-                  BoxShadow(color: Colors.grey.shade200, blurRadius: 6, offset: const Offset(0, 2)),
-                ],
-              ),
+          decoration: widget.wrapperDecoration ?? const BoxDecoration(),
           child: field,
         );
       },
@@ -94,12 +88,18 @@ class _GuestNameAutocompleteState extends State<GuestNameAutocomplete> {
         return Align(
           alignment: Alignment.topLeft,
           child: Material(
-            elevation: 4,
-            borderRadius: BorderRadius.circular(10),
+            elevation: 8,
+            shadowColor: const Color(0x33121614),
+            color: AppColors.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: AppRadius.control,
+              side: const BorderSide(color: AppColors.hairline),
+            ),
+            clipBehavior: Clip.antiAlias,
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 240, maxWidth: 400),
               child: ListView.builder(
-                padding: EdgeInsets.zero,
+                padding: const EdgeInsets.symmetric(vertical: 6),
                 shrinkWrap: true,
                 itemCount: options.length,
                 itemBuilder: (ctx, i) {
@@ -108,17 +108,9 @@ class _GuestNameAutocompleteState extends State<GuestNameAutocomplete> {
                   final phone = (g['phone'] ?? '').toString();
                   return ListTile(
                     dense: true,
-                    leading: Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: Colors.indigo.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(Icons.person_rounded, color: Colors.indigo, size: 18),
-                    ),
-                    title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                    subtitle: Text(phone, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                    leading: InitialsAvatar(name, size: 34),
+                    title: Text(name, style: AppText.bodyStrong.copyWith(fontSize: 14)),
+                    subtitle: Text(phone, style: AppText.footnote),
                     onTap: () => onSelected(g),
                   );
                 },

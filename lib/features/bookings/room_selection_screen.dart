@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:odon_booking/shared/widgets/odon_ui.dart';
 import 'package:intl/intl.dart';
 import 'package:odon_booking/core/api/api_service.dart';
 import 'package:odon_booking/features/guests/widgets/guest_name_autocomplete.dart';
@@ -180,7 +181,7 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
       lastDate: DateTime(2030),
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
-          colorScheme: const ColorScheme.light(primary: Colors.indigo, onPrimary: Colors.white),
+          colorScheme: const ColorScheme.light(primary: AppColors.ink, onPrimary: Colors.white),
         ),
         child: child!,
       ),
@@ -203,7 +204,7 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
       lastDate: DateTime(2030),
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
-          colorScheme: const ColorScheme.light(primary: Colors.indigo, onPrimary: Colors.white),
+          colorScheme: const ColorScheme.light(primary: AppColors.ink, onPrimary: Colors.white),
         ),
         child: child!,
       ),
@@ -246,7 +247,6 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
               '${clashing.length > 1 ? 'are' : 'is'} booked on these dates and '
               '${clashing.length > 1 ? 'were' : 'was'} unselected. Please pick again.',
             ),
-            backgroundColor: Colors.orange.shade700,
           ),
         );
       }
@@ -404,9 +404,6 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
         content: Text(hasInventoryIssue
             ? 'Booking saved! Check inventory levels.'
             : 'Booking saved and inventory updated.'),
-        backgroundColor: Colors.green.shade600,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
     _resetBooking();
@@ -462,80 +459,44 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
       return MapEntry(roomNum, type);
     }).toList();
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.green.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.green.shade200),
-      ),
+    return SurfaceCard(
+      shadow: false,
+      padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: Colors.green.shade100,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-              border: Border(bottom: BorderSide(color: Colors.green.shade200)),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.check_circle_rounded, color: Colors.green.shade700, size: 16),
-                const SizedBox(width: 8),
-                Text(
-                  '${_selectedRooms.length} room${_selectedRooms.length > 1 ? 's' : ''} selected',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: Colors.green.shade800,
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-            ),
+          Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: AppColors.ink, size: 18),
+              const SizedBox(width: 8),
+              Text(
+                '${_selectedRooms.length} room${_selectedRooms.length > 1 ? 's' : ''} selected',
+                style: AppText.bodyStrong.copyWith(fontSize: 14),
+              ),
+            ],
           ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
-                  children: roomList.map((entry) {
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.green.shade300),
-                      ),
-                      child: Text(
-                        'Room ${entry.key.padLeft(3, '0')} · ${entry.value}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.green.shade800,
-                        ),
-                      ),
-                    );
-                  }).toList(),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: roomList.map((entry) {
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.canvas,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.hairline),
                 ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(Icons.info_outline_rounded, size: 12, color: Colors.green.shade600),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        'Tap + on a selected room to add an extra bed',
-                        style: TextStyle(fontSize: 11, color: Colors.green.shade700),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text(entry.key.padLeft(3, '0'), style: AppText.number(13)),
+                  const SizedBox(width: 6),
+                  Text(entry.value, style: AppText.footnote.copyWith(fontSize: 12, color: AppColors.ink2)),
+                ]),
+              );
+            }).toList(),
           ),
+          const SizedBox(height: 10),
+          Text('Tap + on a selected room to add an extra bed.', style: AppText.footnote.copyWith(fontSize: 12)),
         ],
       ),
     );
@@ -549,13 +510,7 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
     final kids = _kidsEntered;
 
     return Card(
-      elevation: 0,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: Colors.grey.shade200),
-      ),
-      child: Padding(
+child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -591,12 +546,12 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
               // worth showing, along with a one-tap way back.
               Row(
                 children: [
-                  Icon(Icons.info_outline_rounded, size: 13, color: Colors.orange.shade700),
+                  const Icon(Icons.info_outline_rounded, size: 14, color: AppColors.warning),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       'Rooms selected fit $auto adults',
-                      style: TextStyle(fontSize: 11.5, color: Colors.orange.shade800),
+                      style: AppText.footnote.copyWith(color: AppColors.warning),
                     ),
                   ),
                   InkWell(
@@ -609,11 +564,7 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       child: Text(
                         'Reset',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.indigo.shade600,
-                        ),
+                        style: AppText.footnote.copyWith(fontWeight: FontWeight.w700, color: AppColors.ink),
                       ),
                     ),
                   ),
@@ -622,43 +573,25 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
             else
               Row(
                 children: [
-                  Icon(Icons.info_outline_rounded, size: 13, color: Colors.grey.shade500),
+                  const Icon(Icons.info_outline_rounded, size: 14, color: AppColors.ink3),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       auto == 0
                           ? 'Adults fills in once rooms are selected. Kids are never counted when picking a room — record them here.'
                           : 'Adults comes from the rooms selected; edit it if the party differs. Kids are tracked separately.',
-                      style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
+                      style: AppText.footnote,
                     ),
                   ),
                 ],
               ),
             if (kids > 0) ...[
               const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                decoration: BoxDecoration(
-                  color: Colors.indigo.shade50,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.groups_rounded, size: 14, color: Colors.indigo.shade600),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Total in party: ${_adultsEntered + kids} '
-                      '($_adultsEntered adult${_adultsEntered == 1 ? '' : 's'}, '
-                      '$kids kid${kids == 1 ? '' : 's'})',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.indigo.shade700,
-                      ),
-                    ),
-                  ],
-                ),
+              StatusPill(
+                'Party of ${_adultsEntered + kids} · '
+                '$_adultsEntered adult${_adultsEntered == 1 ? '' : 's'}, '
+                '$kids kid${kids == 1 ? '' : 's'}',
+                icon: Icons.groups_outlined,
               ),
             ],
           ],
@@ -672,98 +605,37 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F6FA),
       body: _configLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.indigo))
+          ? const LoadingView()
           : CustomScrollView(
               slivers: [
-                // Gradient header
-                SliverAppBar(
-                  expandedHeight: 120,
-                  pinned: true,
-                  backgroundColor: Colors.indigo,
-                  iconTheme: const IconThemeData(color: Colors.white),
-                  flexibleSpace: FlexibleSpaceBar(
-                    titlePadding: const EdgeInsets.fromLTRB(56, 0, 16, 16),
-                    title: const Text(
-                      'New Booking',
-                      style: TextStyle(
-                        fontFamily: 'Outfit',
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        fontSize: 20,
-                      ),
-                    ),
-                    background: Container(
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [Color(0xFF312E81), Color(0xFF4F46E5)],
-                        ),
-                      ),
-                      child: Align(
-                        alignment: Alignment.bottomRight,
-                        child: Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Icon(
-                            Icons.hotel_rounded,
-                            size: 56,
-                            color: Colors.white.withValues(alpha: 0.12),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+                const LargeTitleSliverAppBar(
+                  title: 'New booking',
+                  subtitle: 'Guest, dates, plan and rooms',
+                  maxWidth: AppLayout.maxForm,
                 ),
 
                 SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
+                  child: PageBody(
+                    maxWidth: AppLayout.maxForm,
+                    padding: EdgeInsets.fromLTRB(AppLayout.gutter(context), 8, AppLayout.gutter(context), 16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // ── Prefilled-from-invoice banner ─────────────────
                         if (widget.prefill != null) ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                            decoration: BoxDecoration(
-                              color: Colors.amber.shade50,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.amber.shade300),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.auto_awesome_rounded,
-                                    size: 18, color: Colors.amber.shade800),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    'Details prefilled from the invoice. Just select the room(s) below and save.',
-                                    style: TextStyle(
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.amber.shade900,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
+                          const InlineBanner(
+                            'Details copied from the invoice. Pick the room(s) below and save.',
+                            tone: BannerTone.info,
                           ),
                           const SizedBox(height: 20),
                         ],
 
                         // ── Guest details ─────────────────────────────────
-                        _sectionLabel('Guest Details'),
+                        _sectionLabel('Guest'),
                         const SizedBox(height: 10),
                         Card(
-                          elevation: 0,
-                          color: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            side: BorderSide(color: Colors.grey.shade200),
-                          ),
-                          child: Padding(
+child: Padding(
                             padding: const EdgeInsets.all(16),
                             child: Column(
                               children: [
@@ -785,16 +657,10 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                         const SizedBox(height: 20),
 
                         // ── Stay dates ────────────────────────────────────
-                        _sectionLabel('Stay Dates'),
+                        _sectionLabel('Stay'),
                         const SizedBox(height: 10),
                         Card(
-                          elevation: 0,
-                          color: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            side: BorderSide(color: Colors.grey.shade200),
-                          ),
-                          child: Padding(
+child: Padding(
                             padding: const EdgeInsets.all(16),
                             child: Column(
                               children: [
@@ -812,14 +678,14 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                                           Container(
                                             width: 1,
                                             height: 30,
-                                            color: Colors.grey.shade200,
+                                            color: AppColors.hairline,
                                           ),
                                           Icon(Icons.arrow_forward_rounded,
-                                              size: 16, color: Colors.grey.shade400),
+                                              size: 16, color: AppColors.ink3),
                                           Container(
                                             width: 1,
                                             height: 30,
-                                            color: Colors.grey.shade200,
+                                            color: AppColors.hairline,
                                           ),
                                         ],
                                       ),
@@ -833,27 +699,11 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                                 ),
                                 if (_numOfNights > 0) ...[
                                   const SizedBox(height: 12),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.indigo.shade50,
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.nights_stay_outlined,
-                                            size: 14, color: Colors.indigo.shade600),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          '$_numOfNights night${_numOfNights > 1 ? 's' : ''}',
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.indigo.shade700,
-                                          ),
-                                        ),
-                                      ],
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: StatusPill(
+                                      '$_numOfNights night${_numOfNights > 1 ? 's' : ''}',
+                                      icon: Icons.nights_stay_outlined,
                                     ),
                                   ),
                                 ],
@@ -864,39 +714,45 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                         const SizedBox(height: 20),
 
                         // ── Package ───────────────────────────────────────
-                        _sectionLabel('Package'),
+                        _sectionLabel('Meal plan'),
                         const SizedBox(height: 10),
                         Card(
-                          elevation: 0,
-                          color: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            side: BorderSide(color: Colors.grey.shade200),
-                          ),
-                          child: Padding(
+child: Padding(
                             padding: const EdgeInsets.all(16),
                             child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _indigoDropdown(
-                                  label: 'Select Package',
+                                ChoiceChipGroup(
+                                  items: const ['Full Board', 'Half Board', 'Room Only', 'BnB', 'Dinner Only'],
                                   value: _packageType,
-                                  icon: Icons.restaurant_menu_rounded,
-                                  items: ['Full Board', 'Half Board', 'Room Only', 'BnB', 'Dinner Only'],
+                                  dotColor: AppColors.forPackage,
                                   onChanged: (v) => setState(() {
                                     _packageType = v;
                                     if (v != 'Full Board' && v != 'Half Board') _mealStart = null;
                                   }),
                                 ),
-                                if (_packageType == 'Full Board' || _packageType == 'Half Board') ...[
-                                  const SizedBox(height: 12),
-                                  _indigoDropdown(
-                                    label: 'First Meal on Arrival',
-                                    value: _mealStart,
-                                    icon: Icons.restaurant_rounded,
-                                    items: ['Lunch', 'Dinner'],
-                                    onChanged: (v) => setState(() => _mealStart = v),
-                                  ),
-                                ],
+                                AnimatedSize(
+                                  duration: AppMotion.base,
+                                  curve: AppMotion.ease,
+                                  alignment: Alignment.topLeft,
+                                  child: (_packageType == 'Full Board' || _packageType == 'Half Board')
+                                      ? Padding(
+                                          padding: const EdgeInsets.only(top: 16),
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text('First meal on arrival', style: AppText.footnote.copyWith(color: AppColors.ink2)),
+                                              const SizedBox(height: 8),
+                                              ChoiceChipGroup(
+                                                items: const ['Lunch', 'Dinner'],
+                                                value: _mealStart,
+                                                onChanged: (v) => setState(() => _mealStart = v),
+                                              ),
+                                            ],
+                                          ),
+                                        )
+                                      : const SizedBox(width: double.infinity),
+                                ),
                               ],
                             ),
                           ),
@@ -904,7 +760,7 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                         const SizedBox(height: 20),
 
                         // ── Room selection ────────────────────────────────
-                        _sectionLabel('Select Rooms'),
+                        _sectionLabel('Rooms'),
                         const SizedBox(height: 10),
                         RoomPicker(
                           roomConfig: _roomConfig,
@@ -932,7 +788,7 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                         if (_selectedRooms.isNotEmpty) const SizedBox(height: 20),
 
                         // ── Head count ────────────────────────────────────
-                        _sectionLabel('Head Count'),
+                        _sectionLabel('Guests'),
                         const SizedBox(height: 10),
                         _buildHeadCount(),
                         const SizedBox(height: 20),
@@ -940,88 +796,30 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                         // ── Options ───────────────────────────────────────
                         _sectionLabel('Options'),
                         const SizedBox(height: 10),
-                        Card(
-                          elevation: 0,
-                          color: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            side: BorderSide(color: Colors.grey.shade200),
-                          ),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(14),
-                            onTap: () => setState(() => _needDriver = !_needDriver),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 38,
-                                    height: 38,
-                                    decoration: BoxDecoration(
-                                      color: _needDriver
-                                          ? Colors.amber.shade50
-                                          : Colors.grey.shade50,
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Icon(
-                                      Icons.directions_car_rounded,
-                                      color: _needDriver
-                                          ? Colors.amber.shade700
-                                          : Colors.grey.shade400,
-                                      size: 20,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        const Text(
-                                          'Requires Driver Room',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                        Text(
-                                          'Reserve a room for driver',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey.shade500,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Transform.scale(
-                                    scale: 0.9,
-                                    child: Switch(
-                                      value: _needDriver,
-                                      activeColor: Colors.amber.shade700,
-                                      onChanged: (v) => setState(() => _needDriver = v),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
+                        OptionToggleCard(
+                          icon: Icons.directions_car_rounded,
+                          title: 'Driver room',
+                          subtitle: 'Keep a room for the driver',
+                          value: _needDriver,
+                          color: AppColors.warning,
+                          onChanged: (v) => setState(() => _needDriver = v),
                         ),
                         const SizedBox(height: 10),
                         OptionToggleCard(
                           icon: Icons.rice_bowl_rounded,
-                          title: 'Need Kiri Pidu',
+                          title: 'Kiri pidu',
                           subtitle: 'Prepare kiri pidu for this booking',
                           value: _needKiriPidu,
-                          color: Colors.teal,
+                          color: AppColors.roomOnly,
                           onChanged: (v) => setState(() => _needKiriPidu = v),
                         ),
                         const SizedBox(height: 10),
                         OptionToggleCard(
                           icon: Icons.schedule_rounded,
-                          title: 'Early Check-in',
+                          title: 'Early check-in',
                           subtitle: 'Arriving before 2:00 PM',
                           value: _earlyCheckIn,
-                          color: Colors.green,
+                          color: AppColors.success,
                           onChanged: (v) => setState(() => _earlyCheckIn = v),
                           child: OptionalTimeField(
                             value: _earlyCheckInTime,
@@ -1032,7 +830,7 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                         const SizedBox(height: 10),
                         OptionToggleCard(
                           icon: Icons.more_time_rounded,
-                          title: 'Late Check-out',
+                          title: 'Late check-out',
                           subtitle: 'Leaving after 11:00 AM',
                           value: _lateCheckOut,
                           color: Colors.deepOrange,
@@ -1046,16 +844,10 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                         const SizedBox(height: 20),
 
                         // ── Financial details ─────────────────────────────
-                        _sectionLabel('Financial Details'),
+                        _sectionLabel('Payment'),
                         const SizedBox(height: 10),
                         Card(
-                          elevation: 0,
-                          color: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            side: BorderSide(color: Colors.grey.shade200),
-                          ),
-                          child: Padding(
+child: Padding(
                             padding: const EdgeInsets.all(16),
                             child: Column(
                               children: [
@@ -1077,11 +869,7 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                                   alignment: Alignment.centerLeft,
                                   child: Text(
                                     'Extra charges (added to the total)',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.grey.shade600,
-                                    ),
+                                    style: AppText.footnote.copyWith(color: AppColors.ink2, fontWeight: FontWeight.w600),
                                   ),
                                 ),
                                 const SizedBox(height: 8),
@@ -1111,37 +899,11 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                         const SizedBox(height: 28),
 
                         // ── Save button ───────────────────────────────────
-                        SizedBox(
-                          width: double.infinity,
-                          height: 52,
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF312E81), Color(0xFF4F46E5)],
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: ElevatedButton.icon(
-                              onPressed: _saveBooking,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.transparent,
-                                shadowColor: Colors.transparent,
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              icon: const Icon(Icons.check_rounded, size: 20),
-                              label: const Text(
-                                'Save Booking',
-                                style: TextStyle(
-                                  fontFamily: 'Outfit',
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ),
+                        FilledButton.icon(
+                          onPressed: _saveBooking,
+                          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(54)),
+                          icon: const Icon(Icons.check_rounded, size: 20),
+                          label: const Text('Save booking'),
                         ),
                         const SizedBox(height: 24),
                       ],
@@ -1159,51 +921,31 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
     required VoidCallback onTap,
   }) {
     final hasDate = date != null;
-    return GestureDetector(
+    return Pressable(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      pressedScale: 0.98,
+      child: AnimatedContainer(
+        duration: AppMotion.fast,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: hasDate ? Colors.indigo.shade50 : Colors.grey.shade50,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: hasDate ? Colors.indigo.shade200 : Colors.grey.shade200,
-          ),
+          color: hasDate ? AppColors.surface : AppColors.canvas,
+          borderRadius: AppRadius.control,
+          border: Border.all(color: hasDate ? AppColors.ink : AppColors.hairlineStrong),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text(label.toUpperCase(), style: AppText.eyebrow.copyWith(fontSize: 10)),
+            const SizedBox(height: 6),
             Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: hasDate ? Colors.indigo.shade500 : Colors.grey.shade500,
-                letterSpacing: 0.3,
-              ),
+              date != null ? DateFormat('EEE d MMM').format(date) : 'Select date',
+              style: hasDate
+                  ? AppText.bodyStrong
+                  : AppText.body.copyWith(color: AppColors.ink4),
+              overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Icon(
-                  Icons.calendar_today_outlined,
-                  size: 14,
-                  color: hasDate ? Colors.indigo.shade600 : Colors.grey.shade400,
-                ),
-                const SizedBox(width: 6),
-                Flexible(
-                  child: Text(
-                    date != null ? DateFormat('d MMM yyyy').format(date) : 'Tap to set',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: hasDate ? Colors.indigo.shade800 : Colors.grey.shade400,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
+            if (date != null)
+              Text(DateFormat('yyyy').format(date), style: AppText.footnote.copyWith(fontSize: 12)),
           ],
         ),
       ),
@@ -1223,60 +965,12 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
       maxLines: maxLines,
       keyboardType: keyboardType,
       onChanged: onChanged,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon, color: Colors.indigo.shade400, size: 20),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Colors.grey.shade200),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: Colors.indigo, width: 2),
-        ),
-        filled: true,
-        fillColor: Colors.grey.shade50,
-      ),
-    );
-  }
-
-  Widget _indigoDropdown({
-    required String label,
-    required String? value,
-    required IconData icon,
-    required List<String> items,
-    required ValueChanged<String?> onChanged,
-  }) {
-    return DropdownButtonFormField<String>(
-      value: value,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon, color: Colors.indigo.shade400, size: 20),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Colors.grey.shade200),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: Colors.indigo, width: 2),
-        ),
-        filled: true,
-        fillColor: Colors.grey.shade50,
-      ),
-      items: items.map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(),
-      onChanged: onChanged,
+      decoration: fieldDecoration(label, icon: icon),
     );
   }
 }
 
-Widget _sectionLabel(String text) => Text(
-      text.toUpperCase(),
-      style: TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w700,
-        color: Colors.grey.shade500,
-        letterSpacing: 1.1,
-      ),
+Widget _sectionLabel(String text) => Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Text(text.toUpperCase(), style: AppText.eyebrow),
     );

@@ -826,3 +826,81 @@ InputDecoration fieldDecoration(String label,
       prefixIcon: icon == null ? null : Icon(icon, size: 19),
       suffixIcon: suffix,
     );
+
+/// Tappable options instead of a dropdown: one tap, every choice visible.
+/// With [allowDeselect], tapping the selected chip clears it (onChanged(null)).
+class ChoiceChipGroup extends StatelessWidget {
+  final List<String> items;
+  final String? value;
+  final ValueChanged<String?> onChanged;
+  final Color Function(String)? dotColor;
+  final IconData Function(String)? iconFor;
+  final bool allowDeselect;
+
+  const ChoiceChipGroup({
+    super.key,
+    required this.items,
+    required this.value,
+    required this.onChanged,
+    this.dotColor,
+    this.iconFor,
+    this.allowDeselect = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: items.map((item) {
+        final selected = item == value;
+        final fg = selected ? Colors.white : AppColors.ink;
+        return Pressable(
+          onTap: () => onChanged(selected && allowDeselect ? null : item),
+          pressedScale: 0.95,
+          semanticLabel: item,
+          child: AnimatedContainer(
+            duration: AppMotion.fast,
+            curve: AppMotion.ease,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: selected ? AppColors.ink : AppColors.surface,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: selected ? AppColors.ink : AppColors.hairlineStrong),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              if (dotColor != null) ...[
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: dotColor!(item),
+                    shape: BoxShape.circle,
+                    border: selected ? Border.all(color: Colors.white, width: 1) : null,
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+              if (iconFor != null) ...[
+                Icon(iconFor!(item), size: 16, color: fg),
+                const SizedBox(width: 6),
+              ],
+              Text(item, style: AppText.bodyStrong.copyWith(fontSize: 14, color: fg)),
+            ]),
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
+
+/// Upper-case label above a form card.
+class FormSectionLabel extends StatelessWidget {
+  final String text;
+  const FormSectionLabel(this.text, {super.key});
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(4, 24, 4, 10),
+        child: Text(text.toUpperCase(), style: AppText.eyebrow),
+      );
+}

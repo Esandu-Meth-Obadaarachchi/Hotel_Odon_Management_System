@@ -118,7 +118,7 @@ class OptionToggleCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final bool value;
-  final MaterialColor color;
+  final Color color;
   final ValueChanged<bool> onChanged;
   final Widget? child;
 
@@ -135,7 +135,8 @@ class OptionToggleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = color.shade700;
+    final c = color;
+    final accent = c is MaterialColor ? c.shade700 : c;
     return AnimatedContainer(
       duration: AppMotion.base,
       curve: AppMotion.ease,
