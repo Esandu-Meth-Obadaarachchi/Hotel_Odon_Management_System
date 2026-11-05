@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:odon_booking/shared/widgets/odon_ui.dart';
 
 /// Extra charges on a booking: a list of `{reason, amount}` pairs, such as an
 /// extra dinner or a late check-out fee. The booking's `total` already
@@ -127,7 +128,7 @@ class ExtraChargesEditorState extends State<ExtraChargesEditor> {
                 ),
                 IconButton(
                   tooltip: 'Remove charge',
-                  icon: Icon(Icons.close_rounded, color: Colors.red.shade400, size: 20),
+                  icon: const Icon(Icons.close_rounded, color: AppColors.ink3, size: 20),
                   onPressed: () {
                     setState(() => _rows.removeAt(i).dispose());
                     _notify();
@@ -141,7 +142,6 @@ class ExtraChargesEditorState extends State<ExtraChargesEditor> {
           onPressed: () => setState(() => _rows.add(_ChargeRow())),
           icon: const Icon(Icons.add_rounded, size: 18),
           label: const Text('Add extra charge'),
-          style: TextButton.styleFrom(foregroundColor: Colors.indigo),
         ),
       ],
     );
@@ -150,18 +150,7 @@ class ExtraChargesEditorState extends State<ExtraChargesEditor> {
   InputDecoration _decoration(String label, IconData icon) => InputDecoration(
         labelText: label,
         isDense: true,
-        prefixIcon: Icon(icon, color: Colors.indigo.shade400, size: 18),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: Colors.indigo, width: 2),
-        ),
-        filled: true,
-        fillColor: Colors.grey.shade50,
+        prefixIcon: Icon(icon, size: 18),
       );
 }
 
@@ -199,42 +188,38 @@ class ExtraChargesSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (charges.isEmpty) return const SizedBox.shrink();
-    final color = Colors.deepPurple;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.25)),
+        color: AppColors.canvas,
+        borderRadius: AppRadius.control,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.add_card_rounded, size: 14, color: color),
+              const Icon(Icons.add_card_rounded, size: 15, color: AppColors.ink2),
               const SizedBox(width: 6),
-              Text('Extra Charges',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
+              Text('Extra charges', style: AppText.bodyStrong.copyWith(fontSize: 13)),
               const Spacer(),
-              Text(formatLkr(sumExtraCharges(charges)),
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
+              Text(formatLkr(sumExtraCharges(charges)), style: AppText.number(13)),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           ...charges.map((c) => Padding(
-                padding: const EdgeInsets.only(top: 2),
+                padding: const EdgeInsets.only(top: 3),
                 child: Row(
                   children: [
                     Expanded(
                       child: Text(
                         (c['reason'] as String).isEmpty ? 'Extra charge' : c['reason'] as String,
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+                        style: AppText.callout.copyWith(fontSize: 13),
                       ),
                     ),
                     Text(formatLkr((c['amount'] as num).toDouble()),
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade800)),
+                        style: AppText.number(13, weight: FontWeight.w500, color: AppColors.ink2)),
                   ],
                 ),
               )),

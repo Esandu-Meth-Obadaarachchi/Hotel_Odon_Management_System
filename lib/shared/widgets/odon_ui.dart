@@ -654,3 +654,175 @@ class InfoRow extends StatelessWidget {
         ]),
       );
 }
+
+// ── Large-title header ──────────────────────────────────────────────────────
+
+/// iOS-style large title: a big left-aligned title that, as you scroll,
+/// fades out while a small centred title fades into a frosted bar.
+class LargeTitleSliverAppBar extends StatelessWidget {
+  final String title;
+  final String? subtitle;
+  final List<Widget>? actions;
+  final Widget? leading;
+  final PreferredSizeWidget? bottom;
+  final double maxWidth;
+
+  const LargeTitleSliverAppBar({
+    super.key,
+    required this.title,
+    this.subtitle,
+    this.actions,
+    this.leading,
+    this.bottom,
+    this.maxWidth = AppLayout.maxContent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final top = MediaQuery.paddingOf(context).top;
+    final bottomH = bottom?.preferredSize.height ?? 0;
+    final large = subtitle == null ? 60.0 : 78.0;
+    const toolbar = kToolbarHeight;
+    final inset = AppLayout.inset(context, maxWidth);
+
+    return SliverAppBar(
+      pinned: true,
+      expandedHeight: toolbar + large + bottomH,
+      backgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      shape: const Border(),
+      leading: leading,
+      actions: actions,
+      bottom: bottom,
+      flexibleSpace: LayoutBuilder(builder: (ctx, c) {
+        final minH = top + toolbar + bottomH;
+        final maxH = top + toolbar + large + bottomH;
+        final t = ((c.maxHeight - minH) / (maxH - minH)).clamp(0.0, 1.0); // 1 = expanded
+        final collapsed = t < 0.02;
+        return Stack(fit: StackFit.expand, children: [
+          AnimatedOpacity(
+            opacity: collapsed ? 1 : 0,
+            duration: AppMotion.fast,
+            child: const Frosted(
+              border: Border(bottom: BorderSide(color: AppColors.hairline, width: 0.5)),
+              child: SizedBox.expand(),
+            ),
+          ),
+          if (!collapsed) const ColoredBox(color: AppColors.canvas),
+          // Small title in the bar.
+          Positioned(
+            top: top,
+            left: 64,
+            right: 64,
+            height: toolbar,
+            child: Center(
+              child: Opacity(
+                opacity: (1 - t * 4).clamp(0.0, 1.0),
+                child: Text(title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.headline.copyWith(fontSize: 17)),
+              ),
+            ),
+          ),
+          // Large title under the bar.
+          Positioned(
+            left: inset,
+            right: inset,
+            bottom: bottomH + 12,
+            child: Opacity(
+              opacity: ((t - 0.25) / 0.75).clamp(0.0, 1.0),
+              child: Transform.translate(
+                offset: Offset(0, (1 - t) * 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.largeTitle),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 4),
+                      Text(subtitle!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppText.callout),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ]);
+      }),
+    );
+  }
+}
+
+/// Initials in a circle — a person reads faster than a generic icon.
+class InitialsAvatar extends StatelessWidget {
+  final String name;
+  final double size;
+  const InitialsAvatar(this.name, {super.key, this.size = 40});
+
+  @override
+  Widget build(BuildContext context) {
+    final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    final initials = parts.isEmpty
+        ? '?'
+        : (parts.first[0] + (parts.length > 1 ? parts.last[0] : '')).toUpperCase();
+    return Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: const BoxDecoration(color: AppColors.sunken, shape: BoxShape.circle),
+      child: Text(initials,
+          style: AppText.bodyStrong.copyWith(fontSize: size * 0.36, color: AppColors.ink2)),
+    );
+  }
+}
+
+/// Square icon button with a hairline, for actions on cards.
+class CardIconButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+  final bool filled;
+
+  const CardIconButton(this.icon,
+      {super.key, required this.tooltip, this.onPressed, this.filled = false});
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+        message: tooltip,
+        child: Pressable(
+          onTap: onPressed,
+          pressedScale: 0.92,
+          semanticLabel: tooltip,
+          child: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: filled ? AppColors.ink : AppColors.surface,
+              borderRadius: BorderRadius.circular(11),
+              border: Border.all(color: filled ? AppColors.ink : AppColors.hairlineStrong),
+            ),
+            child: Icon(icon, size: 18, color: filled ? Colors.white : AppColors.ink),
+          ),
+        ),
+      );
+}
+
+/// Standard text field decoration. Borders, fill and colours come from the
+/// theme; screens only say what the field is.
+InputDecoration fieldDecoration(String label,
+        {IconData? icon, String? hint, String? helper, Widget? suffix, String? prefixText}) =>
+    InputDecoration(
+      labelText: label,
+      hintText: hint,
+      helperText: helper,
+      prefixText: prefixText,
+      prefixIcon: icon == null ? null : Icon(icon, size: 19),
+      suffixIcon: suffix,
+    );

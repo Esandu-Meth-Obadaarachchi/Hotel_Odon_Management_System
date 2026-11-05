@@ -112,6 +112,20 @@ class AppLayout {
   static bool isWide(BuildContext c) => MediaQuery.sizeOf(c).width >= 900;
   static double gutter(BuildContext c) =>
       MediaQuery.sizeOf(c).width >= 700 ? 24 : AppSpace.gutter;
+
+  /// Side inset that centres a column of at most [maxWidth] inside slivers.
+  static double inset(BuildContext c, [double maxWidth = maxContent]) {
+    final w = MediaQuery.sizeOf(c).width;
+    final g = gutter(c);
+    final centred = (w - maxWidth) / 2;
+    return centred > g ? centred : g;
+  }
+
+  static EdgeInsets sliverPadding(BuildContext c,
+          {double maxWidth = maxContent, double top = 0, double bottom = 0}) {
+    final x = inset(c, maxWidth);
+    return EdgeInsets.fromLTRB(x, top, x, bottom);
+  }
 }
 
 // ── Motion ──────────────────────────────────────────────────────────────────
@@ -254,7 +268,6 @@ class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
-        titleSpacing: 4,
         iconTheme: const IconThemeData(color: AppColors.ink, size: 22),
         actionsIconTheme: const IconThemeData(color: AppColors.ink, size: 22),
         titleTextStyle: AppText.title.copyWith(fontSize: 19),
