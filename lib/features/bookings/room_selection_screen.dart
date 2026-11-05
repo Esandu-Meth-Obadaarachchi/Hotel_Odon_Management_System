@@ -179,12 +179,6 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
       initialDate: DateTime.now(),
       firstDate: DateTime(2020),
       lastDate: DateTime(2030),
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
-          colorScheme: const ColorScheme.light(primary: AppColors.ink, onPrimary: Colors.white),
-        ),
-        child: child!,
-      ),
     );
     if (picked != null && picked != _checkInDate) {
       setState(() {
@@ -202,12 +196,6 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
       initialDate: _checkInDate ?? DateTime.now(),
       firstDate: _checkInDate ?? DateTime.now(),
       lastDate: DateTime(2030),
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
-          colorScheme: const ColorScheme.light(primary: AppColors.ink, onPrimary: Colors.white),
-        ),
-        child: child!,
-      ),
     );
     if (picked != null && picked != _checkOutDate) {
       setState(() => _checkOutDate = picked);
@@ -833,7 +821,7 @@ child: Padding(
                           title: 'Late check-out',
                           subtitle: 'Leaving after 11:00 AM',
                           value: _lateCheckOut,
-                          color: Colors.deepOrange,
+                          color: AppColors.warning,
                           onChanged: (v) => setState(() => _lateCheckOut = v),
                           child: OptionalTimeField(
                             value: _lateCheckOutTime,

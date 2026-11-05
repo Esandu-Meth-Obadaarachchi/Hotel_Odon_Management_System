@@ -605,7 +605,7 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                           _toggleRow(
                             icon: Icons.directions_car_rounded,
                             iconColor: AppColors.warning,
-                            iconBg: Colors.amber.shade50,
+                            iconBg: AppColors.warningSoft,
                             title: 'Driver room',
                             subtitle:
                                 'LKR ${fmt.format(_driverRoomPrice)}/night',
@@ -619,7 +619,7 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                           _toggleRow(
                             icon: Icons.rice_bowl_rounded,
                             iconColor: AppColors.roomOnly,
-                            iconBg: Colors.teal.shade50,
+                            iconBg: AppColors.infoSoft,
                             title: 'Kiri pidu',
                             subtitle: 'Prepare kiri pidu for this booking',
                             value: _needKiriPidu,
@@ -629,7 +629,7 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                           _toggleRow(
                             icon: Icons.schedule_rounded,
                             iconColor: AppColors.success,
-                            iconBg: Colors.green.shade50,
+                            iconBg: AppColors.successSoft,
                             title: 'Early check-in',
                             subtitle: 'Arriving before 2:00 PM',
                             value: _earlyCheckIn,
@@ -648,7 +648,7 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                           _toggleRow(
                             icon: Icons.more_time_rounded,
                             iconColor: AppColors.warning,
-                            iconBg: Colors.deepOrange.shade50,
+                            iconBg: AppColors.warningSoft,
                             title: 'Late check-out',
                             subtitle: 'Leaving after 11:00 AM',
                             value: _lateCheckOut,
@@ -668,7 +668,7 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                           _toggleRow(
                             icon: Icons.calendar_month_rounded,
                             iconColor: AppColors.roomOnly,
-                            iconBg: Colors.teal.shade50,
+                            iconBg: AppColors.infoSoft,
                             title: 'Custom per-day packages',
                             subtitle: 'Different package for each night',
                             value: _customizePackages,

@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:odon_booking/shared/widgets/odon_ui.dart';
 import 'package:odon_booking/core/api/api_service.dart';
 
 import '../home/home_screen.dart';
@@ -151,7 +152,7 @@ class _AccessCheckState extends State<_AccessCheck> {
   @override
   Widget build(BuildContext context) {
     if (_checking) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: LoadingView(label: 'Checking access…'));
     }
     if (!_allowed) {
       return _AccessDeniedScreen(
@@ -172,66 +173,54 @@ class _AccessDeniedScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: Padding(
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.block, color: Color(0xFFEF4444), size: 64),
-                const SizedBox(height: 20),
-                const Text(
-                  'Access denied',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'This account is not authorised to use this dashboard.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Color(0xFF94A3B8), fontSize: 15),
-                ),
-                const SizedBox(height: 14),
-                // Shown verbatim so a near-miss (an extra dot, googlemail.com,
-                // the wrong account in the picker) is immediately obvious.
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1E293B),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFF334155)),
-                  ),
-                  child: SelectableText(
-                    email ?? 'no email on this account',
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 400),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const IconWell(Icons.lock_outline_rounded, size: 64),
+                  const SizedBox(height: 20),
+                  Text('No access yet', style: AppText.title.copyWith(fontSize: 24)),
+                  const SizedBox(height: 8),
+                  Text(
+                    'This Google account isn\'t on the list. Ask the owner to add it under User access.',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Color(0xFFE2E8F0),
-                      fontSize: 14,
-                      fontFamily: 'monospace',
+                    style: AppText.callout,
+                  ),
+                  const SizedBox(height: 16),
+                  // Shown verbatim so a near-miss (an extra dot, googlemail.com,
+                  // the wrong account in the picker) is immediately obvious.
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: AppRadius.control,
+                      border: Border.all(color: AppColors.hairlineStrong),
+                    ),
+                    child: SelectableText(
+                      email ?? 'no email on this account',
+                      textAlign: TextAlign.center,
+                      style: AppText.bodyStrong.copyWith(fontFamily: 'monospace', fontSize: 14),
                     ),
                   ),
-                ),
-                if (reason != null) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    reason!,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                  if (reason != null) ...[
+                    const SizedBox(height: 12),
+                    Text(reason!, textAlign: TextAlign.center, style: AppText.footnote),
+                  ],
+                  const SizedBox(height: 28),
+                  FilledButton.icon(
+                    style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                    onPressed: () => FirebaseAuth.instance.signOut(),
+                    icon: const Icon(Icons.logout_rounded, size: 20),
+                    label: const Text('Use another account'),
                   ),
                 ],
-                const SizedBox(height: 28),
-                FilledButton.icon(
-                  onPressed: () => FirebaseAuth.instance.signOut(),
-                  icon: const Icon(Icons.logout),
-                  label: const Text('Sign out'),
-                ),
-              ],
+              ),
             ),
           ),
         ),

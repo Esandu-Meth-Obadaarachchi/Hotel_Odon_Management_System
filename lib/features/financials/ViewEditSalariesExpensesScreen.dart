@@ -235,12 +235,6 @@ class _ViewEditSalariesExpensesScreenState
                       initialDate: date,
                       firstDate: DateTime(2020),
                       lastDate: DateTime.now().add(const Duration(days: 365)),
-                      builder: (c, child) => Theme(
-                        data: Theme.of(c).copyWith(
-                          colorScheme: const ColorScheme.light(primary: AppColors.ink),
-                        ),
-                        child: child!,
-                      ),
                     );
                     if (picked != null) setS(() => date = picked);
                   },

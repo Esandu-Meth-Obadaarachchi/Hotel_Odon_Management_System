@@ -45,8 +45,10 @@ class _UserAccessScreenState extends State<UserAccessScreen> {
       final data = await _api.fetchAccessList();
       if (!mounted) return;
       setState(() {
-        _emails = List<String>.from((data['emails'] as List? ?? []).map((e) => '$e'));
-        _owners = List<String>.from((data['owners'] as List? ?? []).map((e) => '$e'));
+        _emails =
+            List<String>.from((data['emails'] as List? ?? []).map((e) => '$e'));
+        _owners =
+            List<String>.from((data['owners'] as List? ?? []).map((e) => '$e'));
         _loading = false;
       });
     } catch (e) {
@@ -70,8 +72,10 @@ class _UserAccessScreenState extends State<UserAccessScreen> {
       final data = await _api.addAllowedEmail(email);
       if (!mounted) return;
       setState(() {
-        _emails = List<String>.from((data['emails'] as List? ?? []).map((e) => '$e'));
-        _owners = List<String>.from((data['owners'] as List? ?? []).map((e) => '$e'));
+        _emails =
+            List<String>.from((data['emails'] as List? ?? []).map((e) => '$e'));
+        _owners =
+            List<String>.from((data['owners'] as List? ?? []).map((e) => '$e'));
         _busy = false;
       });
       _emailController.clear();
@@ -117,8 +121,10 @@ class _UserAccessScreenState extends State<UserAccessScreen> {
       final data = await _api.removeAllowedEmail(email);
       if (!mounted) return;
       setState(() {
-        _emails = List<String>.from((data['emails'] as List? ?? []).map((e) => '$e'));
-        _owners = List<String>.from((data['owners'] as List? ?? []).map((e) => '$e'));
+        _emails =
+            List<String>.from((data['emails'] as List? ?? []).map((e) => '$e'));
+        _owners =
+            List<String>.from((data['owners'] as List? ?? []).map((e) => '$e'));
         _busy = false;
       });
       _toast('$email can no longer sign in');
@@ -159,7 +165,8 @@ class _UserAccessScreenState extends State<UserAccessScreen> {
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
-                padding: AppLayout.sliverPadding(context, maxWidth: AppLayout.maxForm, top: 16, bottom: 32),
+                padding: AppLayout.sliverPadding(context,
+                    maxWidth: AppLayout.maxForm, top: 16, bottom: 32),
                 children: [
                   _intro(),
                   const SizedBox(height: 16),
@@ -169,15 +176,19 @@ class _UserAccessScreenState extends State<UserAccessScreen> {
                     _errorBanner(_error!),
                   ],
                   FormSectionLabel('Who can sign in · ${_emails.length}'),
-                  SurfaceCard(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Column(children: [
-                      for (var i = 0; i < _emails.length; i++) ...[
-                        if (i > 0) const Padding(padding: EdgeInsets.only(left: 64), child: Divider()),
-                        _row(_emails[i]),
-                      ],
-                    ]),
-                  ),
+                  if (_emails.isNotEmpty)
+                    SurfaceCard(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Column(children: [
+                        for (var i = 0; i < _emails.length; i++) ...[
+                          if (i > 0)
+                            const Padding(
+                                padding: EdgeInsets.only(left: 64),
+                                child: Divider()),
+                          _row(_emails[i]),
+                        ],
+                      ]),
+                    ),
                 ],
               ),
             ),
@@ -204,7 +215,9 @@ class _UserAccessScreenState extends State<UserAccessScreen> {
                     keyboardType: TextInputType.emailAddress,
                     autocorrect: false,
                     onSubmitted: (_) => _busy ? null : _add(),
-                    decoration: fieldDecoration('Google account', hint: 'name@gmail.com', icon: Icons.alternate_email_rounded),
+                    decoration: fieldDecoration('Google account',
+                        hint: 'name@gmail.com',
+                        icon: Icons.alternate_email_rounded),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -215,19 +228,22 @@ class _UserAccessScreenState extends State<UserAccessScreen> {
                       ? const SizedBox(
                           width: 14,
                           height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
                       : const Icon(Icons.add_rounded, size: 18),
                   label: const Text('Add'),
                 ),
               ],
             ),
             const SizedBox(height: 8),
-            Text('Use the exact Google account they sign in with.', style: AppText.footnote),
+            Text('Use the exact Google account they sign in with.',
+                style: AppText.footnote),
           ],
         ),
       );
 
-  Widget _errorBanner(String message) => InlineBanner(message, tone: BannerTone.warning);
+  Widget _errorBanner(String message) =>
+      InlineBanner(message, tone: BannerTone.warning);
 
   Widget _row(String email) {
     final isOwner = _owners.contains(email);
@@ -235,15 +251,20 @@ class _UserAccessScreenState extends State<UserAccessScreen> {
       padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
       child: Row(
         children: [
-          InitialsAvatar(email.split('@').first.replaceAll(RegExp(r'[._]'), ' '), size: 36),
+          InitialsAvatar(
+              email.split('@').first.replaceAll(RegExp(r'[._]'), ' '),
+              size: 36),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(email, style: AppText.bodyStrong.copyWith(fontSize: 14), overflow: TextOverflow.ellipsis),
+                Text(email,
+                    style: AppText.bodyStrong.copyWith(fontSize: 14),
+                    overflow: TextOverflow.ellipsis),
                 if (isOwner)
-                  Text('Owner · can\'t be removed', style: AppText.footnote.copyWith(fontSize: 12)),
+                  Text('Owner · can\'t be removed',
+                      style: AppText.footnote.copyWith(fontSize: 12)),
               ],
             ),
           ),
@@ -256,7 +277,8 @@ class _UserAccessScreenState extends State<UserAccessScreen> {
             IconButton(
               tooltip: 'Remove access',
               onPressed: _busy ? null : () => _remove(email),
-              icon: const Icon(Icons.remove_circle_outline_rounded, size: 20, color: AppColors.ink3),
+              icon: const Icon(Icons.remove_circle_outline_rounded,
+                  size: 20, color: AppColors.ink3),
             ),
         ],
       ),
