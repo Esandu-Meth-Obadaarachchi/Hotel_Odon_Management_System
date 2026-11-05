@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 
+import 'core/theme/app_theme.dart';
 import 'features/auth/auth_gate.dart';
 import 'features/home/home_screen.dart';
 import 'firebase_options.dart';
@@ -31,6 +32,9 @@ Future<void> main() async {
 
   runApp(MaterialApp(
     debugShowCheckedModeBanner: false,
+    title: 'The Odon',
+    theme: AppTheme.light,
+    themeMode: ThemeMode.light,
     navigatorKey: navigatorKey, // Add this line for image processing
     home: signInEnabled ? const AuthGate() : HomeScreen(),
   ));
