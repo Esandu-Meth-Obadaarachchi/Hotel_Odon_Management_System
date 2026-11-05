@@ -109,7 +109,8 @@ class _GuestNameAutocompleteState extends State<GuestNameAutocomplete> {
                   return ListTile(
                     dense: true,
                     leading: InitialsAvatar(name, size: 34),
-                    title: Text(name, style: AppText.bodyStrong.copyWith(fontSize: 14)),
+                    title: Text(name,
+                        style: AppText.bodyStrong.copyWith(fontSize: 14)),
                     subtitle: Text(phone, style: AppText.footnote),
                     onTap: () => onSelected(g),
                   );

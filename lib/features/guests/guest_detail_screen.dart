@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:odon_booking/shared/widgets/odon_ui.dart';
 import 'package:intl/intl.dart';
 import 'package:odon_booking/core/api/api_service.dart';
 import 'package:odon_booking/features/bookings/edit_booking_screen.dart';
@@ -73,7 +74,9 @@ class _GuestDetailScreenState extends State<GuestDetailScreen> {
   DateTime? get _lastVisit {
     DateTime? latest;
     for (final b in _bookings) {
-      final ci = b['checkIn'] != null ? DateTime.tryParse(b['checkIn'].toString()) : null;
+      final ci = b['checkIn'] != null
+          ? DateTime.tryParse(b['checkIn'].toString())
+          : null;
       if (ci != null && (latest == null || ci.isAfter(latest))) latest = ci;
     }
     return latest;
@@ -82,28 +85,27 @@ class _GuestDetailScreenState extends State<GuestDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F5F9),
-      appBar: AppBar(
-        title: Text(
-          _name,
-          style: const TextStyle(color: Colors.white, fontFamily: 'Outfit', fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: Colors.indigo,
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
+      appBar: AppBar(title: const Text('Guest')),
       body: RefreshIndicator(
         onRefresh: _loadBookings,
-        color: Colors.indigo,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          padding: const EdgeInsets.only(top: 20, bottom: 32),
           children: [
-            _buildHeroCard(),
-            const SizedBox(height: 16),
-            _buildStatsRow(),
-            const SizedBox(height: 20),
-            _buildHistoryHeader(),
-            const SizedBox(height: 8),
-            ..._buildHistoryBody(),
+            PageBody(
+              maxWidth: AppLayout.maxForm,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildHeroCard(),
+                  const SizedBox(height: 20),
+                  _buildStatsRow(),
+                  const SizedBox(height: 28),
+                  _buildHistoryHeader(),
+                  const SizedBox(height: 10),
+                  ..._buildHistoryBody(),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -111,132 +113,50 @@ class _GuestDetailScreenState extends State<GuestDetailScreen> {
   }
 
   Widget _buildHeroCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF4F46E5), Color(0xFF7C3AED)],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(color: Colors.indigo.withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 4)),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Icon(Icons.person_rounded, color: Colors.white, size: 32),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _name,
-                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(Icons.phone, color: Colors.white70, size: 14),
-                    const SizedBox(width: 4),
-                    Text(_phone, style: const TextStyle(color: Colors.white, fontSize: 14)),
-                  ],
-                ),
-                if (_lastVisit != null) ...[
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(Icons.history, color: Colors.white70, size: 13),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Last visit ${DateFormat('dd MMM yyyy').format(_lastVisit!)}',
-                        style: const TextStyle(color: Colors.white70, fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatsRow() {
     return Row(
       children: [
-        Expanded(child: _statCard('${_bookings.length}', 'Bookings', Icons.book_online_rounded, Colors.indigo)),
-        const SizedBox(width: 10),
-        Expanded(child: _statCard('$_totalRoomNights', 'Room-Nights', Icons.nights_stay_rounded, Colors.teal)),
-        const SizedBox(width: 10),
+        InitialsAvatar(_name, size: 64),
+        const SizedBox(width: 16),
         Expanded(
-          child: _statCard(
-            'LKR ${NumberFormat('#,###').format(_totalRevenue)}',
-            'Revenue',
-            Icons.payments_rounded,
-            Colors.green,
-            valueFontSize: 13,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(_name,
+                  style: AppText.largeTitle.copyWith(fontSize: 26),
+                  overflow: TextOverflow.ellipsis),
+              const SizedBox(height: 4),
+              Text(
+                [
+                  if (_phone.isNotEmpty) _phone,
+                  if (_lastVisit != null)
+                    'Last visit ${DateFormat('d MMM yyyy').format(_lastVisit!)}',
+                ].join(' · '),
+                style: AppText.callout,
+              ),
+            ],
           ),
         ),
       ],
     );
   }
 
-  Widget _statCard(String value, String label, IconData icon, Color color, {double valueFontSize = 16}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6, offset: const Offset(0, 2))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: color, size: 16),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(fontSize: valueFontSize, fontWeight: FontWeight.bold, color: const Color(0xFF1E293B)),
-            overflow: TextOverflow.ellipsis,
-          ),
-          Text(label, style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
-        ],
-      ),
-    );
+  Widget _buildStatsRow() {
+    return MetricStrip([
+      Metric('${_bookings.length}', 'Bookings'),
+      Metric('$_totalRoomNights', 'Room-nights'),
+      Metric(NumberFormat.compact().format(_totalRevenue), 'Revenue',
+          caption: 'LKR'),
+    ], valueSize: 24);
   }
 
   Widget _buildHistoryHeader() {
     return Row(
       children: [
-        const Icon(Icons.history_rounded, color: Colors.indigo, size: 18),
-        const SizedBox(width: 6),
-        const Text(
-          'Booking History',
-          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
-        ),
+        Text('STAYS', style: AppText.eyebrow),
         const Spacer(),
         if (_bookings.isNotEmpty)
-          Text('${_bookings.length} total', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+          Text('${_bookings.length} total',
+              style: AppText.footnote.copyWith(fontSize: 12)),
       ],
     );
   }
@@ -245,188 +165,119 @@ class _GuestDetailScreenState extends State<GuestDetailScreen> {
     if (_loading) {
       return const [
         Padding(
-          padding: EdgeInsets.symmetric(vertical: 40),
-          child: Center(child: CircularProgressIndicator(color: Colors.indigo)),
-        ),
+            padding: EdgeInsets.symmetric(vertical: 40), child: LoadingView())
       ];
     }
     if (_error != null) {
       return [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 40),
-          child: Column(
-            children: [
-              Icon(Icons.cloud_off, color: Colors.grey.shade400, size: 48),
-              const SizedBox(height: 8),
-              Text('Failed to load bookings', style: TextStyle(color: Colors.grey.shade600)),
-            ],
-          ),
+        EmptyState(
+          icon: Icons.cloud_off_rounded,
+          title: 'Couldn\'t load stays',
+          message: 'Pull down to try again.',
+          actionLabel: 'Retry',
+          onAction: _loadBookings,
         ),
       ];
     }
     if (_bookings.isEmpty) {
-      return [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 40),
-          child: Column(
-            children: [
-              Icon(Icons.event_busy_rounded, color: Colors.grey.shade300, size: 48),
-              const SizedBox(height: 8),
-              Text('No bookings yet', style: TextStyle(color: Colors.grey.shade500)),
-            ],
-          ),
-        ),
+      return const [
+        EmptyState(icon: Icons.event_busy_outlined, title: 'No stays yet')
       ];
     }
-    return _bookings.map(_buildBookingCard).toList();
+    return [
+      SurfaceCard(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(children: [
+          for (var i = 0; i < _bookings.length; i++) ...[
+            if (i > 0)
+              const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Divider()),
+            _buildBookingCard(_bookings[i]),
+          ],
+        ]),
+      ),
+    ];
   }
 
   Widget _buildBookingCard(Map<String, dynamic> booking) {
-    final ci = booking['checkIn'] != null ? DateTime.tryParse(booking['checkIn'].toString()) : null;
-    final co = booking['checkOut'] != null ? DateTime.tryParse(booking['checkOut'].toString()) : null;
+    final ci = booking['checkIn'] != null
+        ? DateTime.tryParse(booking['checkIn'].toString())
+        : null;
+    final co = booking['checkOut'] != null
+        ? DateTime.tryParse(booking['checkOut'].toString())
+        : null;
     final pkg = (booking['package'] ?? '').toString();
     final nights = (booking['num_of_nights'] as num?)?.toInt() ?? 0;
     final total = (booking['total'] ?? '').toString();
     final rooms = booking['rooms'];
     final isNew = rooms is List && rooms.isNotEmpty;
+    final roomText = isNew
+        ? rooms
+            .map((r) => (r['roomNumber'] ?? '').toString().padLeft(3, '0'))
+            .join(', ')
+        : (booking['roomNumber'] ?? '?').toString();
+    final totalNum = double.tryParse(total.replaceAll(RegExp(r'[^0-9.]'), ''));
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 6, offset: const Offset(0, 2))],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: () async {
-            final result = await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => EditBookingScreen(
-                  booking: booking,
-                  selectedDay: ci ?? DateTime.now(),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => EditBookingScreen(
+                booking: booking,
+                selectedDay: ci ?? DateTime.now(),
+              ),
+            ),
+          );
+          if (result == true) _loadBookings();
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 4,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.forPackage(pkg),
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-            );
-            if (result == true) _loadBookings();
-          },
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Top: package pill + dates
-                Row(
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _packagePill(pkg),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        ci != null && co != null
-                            ? '${DateFormat('dd MMM').format(ci)} → ${DateFormat('dd MMM yyyy').format(co)}'
-                            : 'Dates unavailable',
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                    Text(
+                      ci != null && co != null
+                          ? '${DateFormat('d MMM').format(ci)} – ${DateFormat('d MMM yyyy').format(co)}'
+                          : 'Dates unavailable',
+                      style: AppText.bodyStrong.copyWith(fontSize: 14),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${pkg.isEmpty ? 'No plan' : pkg} · $nights night${nights == 1 ? '' : 's'} · Room $roomText',
+                      style: AppText.footnote,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-
-                // Rooms + nights + total
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    if (isNew)
-                      ...rooms.map((r) {
-                        final roomNum = (r['roomNumber'] ?? '').toString();
-                        final roomType = (r['roomType'] ?? '').toString();
-                        return _roomChip(roomNum, roomType);
-                      })
-                    else
-                      _roomChip(
-                        (booking['roomNumber'] ?? '?').toString(),
-                        (booking['roomType'] ?? '').toString(),
-                      ),
-                    _infoChip(Icons.nights_stay, '${nights}n', Colors.indigo),
-                    if (total.isNotEmpty) _infoChip(Icons.payments, 'LKR $total', Colors.green),
-                  ],
+              ),
+              if (total.isNotEmpty)
+                Text(
+                  totalNum == null
+                      ? total
+                      : NumberFormat('#,##0').format(totalNum),
+                  style: AppText.number(14),
                 ),
-              ],
-            ),
+              const Icon(Icons.chevron_right_rounded, color: AppColors.ink4),
+            ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _packagePill(String pkg) {
-    final color = _packageColor(pkg);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        pkg.isEmpty ? '—' : pkg,
-        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color),
-      ),
-    );
-  }
-
-  Color _packageColor(String pkg) {
-    switch (pkg) {
-      case 'Full Board':  return const Color(0xFF16A34A);
-      case 'Half Board':  return const Color(0xFF2563EB);
-      case 'BnB':         return const Color(0xFF7C3AED);
-      case 'Room Only':   return const Color(0xFF0891B2);
-      case 'Dinner Only': return const Color(0xFFEA580C);
-      default:            return Colors.grey;
-    }
-  }
-
-  Widget _roomChip(String num, String type) {
-    Color c;
-    switch (type) {
-      case 'Family Plus': c = Colors.deepOrange; break;
-      case 'Family':      c = Colors.orange.shade700; break;
-      case 'Triple':      c = Colors.teal; break;
-      case 'Double':      c = Colors.indigo; break;
-      default:            c = Colors.grey; break;
-    }
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: c.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: c.withValues(alpha: 0.3)),
-      ),
-      child: Text(
-        '#$num${type.isNotEmpty ? ' · $type' : ''}',
-        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: c),
-      ),
-    );
-  }
-
-  Widget _infoChip(IconData icon, String label, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 11, color: color),
-          const SizedBox(width: 3),
-          Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
-        ],
       ),
     );
   }

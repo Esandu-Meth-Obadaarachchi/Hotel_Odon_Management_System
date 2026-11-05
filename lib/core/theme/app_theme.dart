@@ -36,6 +36,16 @@ class AppColors {
   static const danger = Color(0xFFB4291E);
   static const info = Color(0xFF235D78);
 
+  // Soft fills and lines for status surfaces (banners, chips, highlights).
+  static const successSoft = Color(0xFFEAF3EE);
+  static const successLine = Color(0xFFC3DCCC);
+  static const dangerSoft = Color(0xFFFAEDEB);
+  static const dangerLine = Color(0xFFEDC6C1);
+  static const warningSoft = Color(0xFFF8F0E3);
+  static const warningLine = Color(0xFFE8D1AC);
+  static const infoSoft = Color(0xFFE9F0F3);
+  static const infoLine = Color(0xFFBED1DB);
+
   // Meal plans (room board + package chips)
   static const fullBoard = Color(0xFF2F6B4D); // palm
   static const halfBoard = Color(0xFF2A5A84); // harbour
