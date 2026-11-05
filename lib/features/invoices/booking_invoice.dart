@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:odon_booking/shared/widgets/odon_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:odon_booking/core/api/api_service.dart';
@@ -64,7 +65,7 @@ Future<void> shareBookingInvoice(
     context: context,
     barrierDismissible: false,
     builder: (_) => const Center(
-      child: CircularProgressIndicator(color: Colors.indigo),
+      child: CircularProgressIndicator(strokeWidth: 2),
     ),
   );
 
@@ -241,8 +242,6 @@ Future<void> shareBookingInvoice(
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Failed to generate invoice: $e'),
-        backgroundColor: Colors.red.shade600,
-        behavior: SnackBarBehavior.floating,
       ),
     );
   }
@@ -307,12 +306,11 @@ void _showShareDialog(BuildContext context, String message, String? pdfUrl) {
     context: context,
     builder: (ctx) {
       return AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         title: Row(
           children: [
-            Icon(Icons.check_circle_rounded, color: Colors.green.shade600),
+            const Icon(Icons.check_circle_rounded, color: AppColors.success),
             const SizedBox(width: 8),
-            const Text('Invoice Ready'),
+            const Text('Invoice ready'),
           ],
         ),
         content: SizedBox(
@@ -328,14 +326,7 @@ void _showShareDialog(BuildContext context, String message, String? pdfUrl) {
                     child: ElevatedButton.icon(
                       icon: const Icon(Icons.ios_share_rounded, size: 18),
                       label: const Text('Share PDF'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green.shade600,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
+                      style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
                       onPressed: () async {
                         final ok = await file_saver.sharePdfLast();
                         if (!ok && context.mounted) {
@@ -344,8 +335,6 @@ void _showShareDialog(BuildContext context, String message, String? pdfUrl) {
                               content: const Text(
                                 'Sharing is not supported in this browser. Use Open PDF instead.',
                               ),
-                              backgroundColor: Colors.orange.shade700,
-                              behavior: SnackBarBehavior.floating,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
@@ -363,10 +352,7 @@ void _showShareDialog(BuildContext context, String message, String? pdfUrl) {
                     child: OutlinedButton.icon(
                       icon: const Icon(Icons.picture_as_pdf_rounded, size: 18),
                       label: const Text('Open PDF'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.indigo,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
+                      style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
                       onPressed: () => file_saver.openPdfUrl(pdfUrl),
                     ),
                   ),
@@ -374,21 +360,16 @@ void _showShareDialog(BuildContext context, String message, String? pdfUrl) {
                 ],
                 Text(
                   'WHATSAPP MESSAGE',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.grey.shade600,
-                    letterSpacing: 1.0,
-                  ),
+                  style: AppText.eyebrow,
                 ),
                 const SizedBox(height: 8),
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
+                    color: AppColors.canvas,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.grey.shade200),
+                    border: Border.all(color: AppColors.hairline),
                   ),
                   child: SelectableText(
                     message,
@@ -400,23 +381,14 @@ void _showShareDialog(BuildContext context, String message, String? pdfUrl) {
                   width: double.infinity,
                   child: ElevatedButton.icon(
                     icon: const Icon(Icons.copy_rounded, size: 18),
-                    label: const Text('Copy Message'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.indigo,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
+                    label: const Text('Copy message'),
+                    style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
                     onPressed: () async {
                       await Clipboard.setData(ClipboardData(text: message));
                       if (!context.mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: const Text('Message copied to clipboard'),
-                          backgroundColor: Colors.green.shade600,
-                          behavior: SnackBarBehavior.floating,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),

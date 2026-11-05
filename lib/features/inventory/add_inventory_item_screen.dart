@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:odon_booking/shared/widgets/odon_ui.dart';
 import 'package:intl/intl.dart';
 import 'package:odon_booking/features/home/home_screen.dart';
 import 'package:odon_booking/core/api/api_service.dart';
@@ -11,8 +12,8 @@ class AddInventoryItemScreen extends StatefulWidget {
 
 class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _itemNameController  = TextEditingController();
-  final TextEditingController _quantityController  = TextEditingController();
+  final TextEditingController _itemNameController = TextEditingController();
+  final TextEditingController _quantityController = TextEditingController();
   DateTime? _purchasedDate;
   final ApiService _apiService = ApiService();
   late Future<List<dynamic>> _inventoryItems;
@@ -42,8 +43,6 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Please select a purchase date'),
-          backgroundColor: Colors.orange.shade600,
-          behavior: SnackBarBehavior.floating,
         ),
       );
       return;
@@ -59,16 +58,13 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Item added successfully'),
-          backgroundColor: Colors.green.shade600,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
       _itemNameController.clear();
       _quantityController.clear();
       setState(() {
-        _purchasedDate  = null;
-        _submitting     = false;
+        _purchasedDate = null;
+        _submitting = false;
         _inventoryItems = _apiService.fetchInventoryItems();
       });
     } catch (e) {
@@ -83,89 +79,31 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F6FA),
       body: CustomScrollView(
         slivers: [
           // ── Gradient header ───────────────────────────────────────────
-          SliverAppBar(
-            expandedHeight: 120,
-            pinned: true,
-            backgroundColor: Colors.indigo,
-            iconTheme: const IconThemeData(color: Colors.white),
-            flexibleSpace: FlexibleSpaceBar(
-              titlePadding: const EdgeInsets.fromLTRB(56, 0, 16, 16),
-              title: const Text(
-                'Inventory',
-                style: TextStyle(
-                  fontFamily: 'Outfit',
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  fontSize: 20,
-                ),
-              ),
-              background: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF312E81), Color(0xFF4F46E5)],
-                  ),
-                ),
-                child: Align(
-                  alignment: Alignment.bottomRight,
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Icon(
-                      Icons.inventory_2_rounded,
-                      size: 56,
-                      color: Colors.white.withValues(alpha: 0.12),
-                    ),
-                  ),
-                ),
-              ),
-            ),
+          const LargeTitleSliverAppBar(
+            title: 'Inventory',
+            subtitle: 'Guest supplies in stock',
           ),
 
           SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
+            child: PageBody(
+              padding: EdgeInsets.fromLTRB(
+                  AppLayout.gutter(context), 8, AppLayout.gutter(context), 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // ── Standard items note ──────────────────────────────
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.indigo.shade50,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.indigo.shade100),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(Icons.info_outline_rounded, color: Colors.indigo.shade600, size: 18),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'Standard items: soap, conditioner, body lotion, shampoo, brush kit',
-                            style: TextStyle(fontSize: 13, color: Colors.indigo.shade700),
-                          ),
-                        ),
-                      ],
-                    ),
+                  const InlineBanner(
+                    'Standard items: soap, conditioner, body lotion, shampoo, brush kit.',
                   ),
                   const SizedBox(height: 20),
 
                   // ── Add item form ────────────────────────────────────
-                  _sectionLabel('Add New Item'),
+                  _sectionLabel('Add an item'),
                   const SizedBox(height: 10),
                   Card(
-                    elevation: 0,
-                    color: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      side: BorderSide(color: Colors.grey.shade200),
-                    ),
                     child: Padding(
                       padding: const EdgeInsets.all(20),
                       child: Form(
@@ -178,21 +116,13 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
                               textCapitalization: TextCapitalization.sentences,
                               decoration: InputDecoration(
                                 labelText: 'Item Name',
-                                prefixIcon: Icon(Icons.inventory_2_outlined, color: Colors.indigo.shade400, size: 20),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                  borderSide: BorderSide(color: Colors.grey.shade200),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                  borderSide: const BorderSide(color: Colors.indigo, width: 2),
-                                ),
-                                filled: true,
-                                fillColor: Colors.grey.shade50,
+                                prefixIcon: const Icon(
+                                    Icons.inventory_2_outlined,
+                                    size: 20),
                               ),
-                              validator: (v) =>
-                                  (v == null || v.isEmpty) ? 'Enter item name' : null,
+                              validator: (v) => (v == null || v.isEmpty)
+                                  ? 'Enter item name'
+                                  : null,
                             ),
                             const SizedBox(height: 14),
 
@@ -202,23 +132,15 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
                               keyboardType: TextInputType.number,
                               decoration: InputDecoration(
                                 labelText: 'Quantity',
-                                prefixIcon: Icon(Icons.numbers_rounded, color: Colors.indigo.shade400, size: 20),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                  borderSide: BorderSide(color: Colors.grey.shade200),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                  borderSide: const BorderSide(color: Colors.indigo, width: 2),
-                                ),
-                                filled: true,
-                                fillColor: Colors.grey.shade50,
+                                prefixIcon:
+                                    const Icon(Icons.numbers_rounded, size: 20),
                               ),
                               validator: (v) {
-                                if (v == null || v.isEmpty) return 'Enter quantity';
+                                if (v == null || v.isEmpty)
+                                  return 'Enter quantity';
                                 final n = int.tryParse(v);
-                                if (n == null || n <= 0) return 'Enter a valid quantity';
+                                if (n == null || n <= 0)
+                                  return 'Enter a valid quantity';
                                 return null;
                               },
                             ),
@@ -235,24 +157,26 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
                                   builder: (ctx, child) => Theme(
                                     data: Theme.of(ctx).copyWith(
                                       colorScheme: const ColorScheme.light(
-                                        primary: Colors.indigo,
+                                        primary: AppColors.ink,
                                         onPrimary: Colors.white,
                                       ),
                                     ),
                                     child: child!,
                                   ),
                                 );
-                                if (picked != null) setState(() => _purchasedDate = picked);
+                                if (picked != null)
+                                  setState(() => _purchasedDate = picked);
                               },
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 15),
                                 decoration: BoxDecoration(
-                                  color: Colors.grey.shade50,
-                                  borderRadius: BorderRadius.circular(10),
+                                  color: AppColors.surface,
+                                  borderRadius: AppRadius.control,
                                   border: Border.all(
                                     color: _purchasedDate == null
-                                        ? Colors.grey.shade200
-                                        : Colors.indigo.shade200,
+                                        ? AppColors.hairlineStrong
+                                        : AppColors.ink,
                                   ),
                                 ),
                                 child: Row(
@@ -260,8 +184,8 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
                                     Icon(
                                       Icons.calendar_today_outlined,
                                       color: _purchasedDate == null
-                                          ? Colors.grey.shade400
-                                          : Colors.indigo.shade400,
+                                          ? AppColors.ink4
+                                          : AppColors.ink3,
                                       size: 20,
                                     ),
                                     const SizedBox(width: 12),
@@ -269,18 +193,20 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
                                       child: Text(
                                         _purchasedDate == null
                                             ? 'Select purchase date'
-                                            : DateFormat('d MMM yyyy').format(_purchasedDate!),
+                                            : DateFormat('d MMM yyyy')
+                                                .format(_purchasedDate!),
                                         style: TextStyle(
                                           fontSize: 15,
                                           color: _purchasedDate == null
-                                              ? Colors.grey.shade500
-                                              : Colors.black87,
+                                              ? AppColors.ink3
+                                              : AppColors.ink,
                                         ),
                                       ),
                                     ),
                                     Text(
                                       'Tap to pick',
-                                      style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                                      style: TextStyle(
+                                          fontSize: 12, color: AppColors.ink4),
                                     ),
                                   ],
                                 ),
@@ -288,37 +214,18 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
                             ),
                             const SizedBox(height: 22),
 
-                            SizedBox(
-                              width: double.infinity,
-                              height: 50,
-                              child: ElevatedButton(
-                                onPressed: _submitting ? null : _submitForm,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.indigo,
-                                  foregroundColor: Colors.white,
-                                  elevation: 0,
-                                  disabledBackgroundColor: Colors.indigo.shade200,
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10)),
-                                ),
-                                child: _submitting
-                                    ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          color: Colors.white,
-                                          strokeWidth: 2,
-                                        ),
-                                      )
-                                    : const Text(
-                                        'Add Item',
-                                        style: TextStyle(
-                                          fontFamily: 'Outfit',
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                              ),
+                            FilledButton(
+                              onPressed: _submitting ? null : _submitForm,
+                              style: FilledButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(52)),
+                              child: _submitting
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                          color: Colors.white, strokeWidth: 2),
+                                    )
+                                  : const Text('Add item'),
                             ),
                           ],
                         ),
@@ -328,7 +235,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
                   const SizedBox(height: 24),
 
                   // ── Inventory list ───────────────────────────────────
-                  _sectionLabel('Current Stock'),
+                  _sectionLabel('In stock'),
                   const SizedBox(height: 10),
                 ],
               ),
@@ -343,49 +250,42 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
                 return const SliverToBoxAdapter(
                   child: Padding(
                     padding: EdgeInsets.symmetric(vertical: 32),
-                    child: Center(child: CircularProgressIndicator(color: Colors.indigo)),
+                    child: Center(
+                        child: CircularProgressIndicator(strokeWidth: 2)),
                   ),
                 );
               }
               if (snapshot.hasError) {
-                return SliverToBoxAdapter(
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(32),
-                      child: Text('Error: ${snapshot.error}',
-                          style: TextStyle(color: Colors.grey.shade500)),
-                    ),
+                return const SliverToBoxAdapter(
+                  child: EmptyState(
+                    icon: Icons.cloud_off_rounded,
+                    title: 'Couldn\'t load stock',
+                    message: 'Check the connection and open this page again.',
                   ),
                 );
               }
               final items = snapshot.data ?? [];
               if (items.isEmpty) {
-                return SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Center(
-                      child: Column(
-                        children: [
-                          Icon(Icons.inventory_2_outlined, size: 48, color: Colors.grey.shade300),
-                          const SizedBox(height: 12),
-                          Text('No items yet', style: TextStyle(color: Colors.grey.shade400)),
-                        ],
-                      ),
-                    ),
+                return const SliverToBoxAdapter(
+                  child: EmptyState(
+                    icon: Icons.inventory_2_outlined,
+                    title: 'Nothing in stock yet',
+                    message: 'Items you add above will show here.',
                   ),
                 );
               }
               return SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+                padding: AppLayout.sliverPadding(context, bottom: 32),
                 sliver: SliverGrid(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
-                    childAspectRatio: 1.05,
+                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 240,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    mainAxisExtent: 156,
                   ),
                   delegate: SliverChildBuilderDelegate(
-                    (_, index) => _buildInventoryCard(items[index] as Map<String, dynamic>),
+                    (_, index) => _buildInventoryCard(
+                        items[index] as Map<String, dynamic>),
                     childCount: items.length,
                   ),
                 ),
@@ -399,96 +299,68 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
 
   Widget _buildInventoryCard(Map<String, dynamic> item) {
     final quantity = item['quantity'] as int? ?? 0;
-    final isLow    = quantity <= 3;
+    final isLow = quantity <= 3;
+    final purchased =
+        DateTime.tryParse(item['purchasedDate']?.toString() ?? '');
 
-    return GestureDetector(
+    return SurfaceCard(
+      padding: const EdgeInsets.all(16),
+      borderColor: isLow ? AppColors.warningLine : AppColors.hairline,
       onTap: () async {
         final result = await Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => EditInventoryItemScreen(item: item)),
+          MaterialPageRoute(
+              builder: (_) => EditInventoryItemScreen(item: item)),
         );
         if (result == true) {
           setState(() => _inventoryItems = _apiService.fetchInventoryItems());
         }
       },
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: isLow
-                ? [Colors.orange.shade700, Colors.orange.shade400]
-                : [Colors.indigo.shade700, Colors.indigo.shade400],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  item['item_name'] ?? 'Unnamed',
+                  style:
+                      AppText.bodyStrong.copyWith(fontSize: 14, height: 1.25),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded,
+                  size: 20, color: AppColors.ink4),
+            ],
           ),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    item['item_name'] ?? 'Unnamed',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      color: Colors.white,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+          const Spacer(),
+          Text('$quantity',
+              style: AppText.number(32,
+                  color: isLow ? AppColors.warning : AppColors.ink)),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  purchased == null
+                      ? 'No date'
+                      : 'Bought ${DateFormat('d MMM').format(purchased)}',
+                  style: AppText.footnote.copyWith(fontSize: 12),
+                  overflow: TextOverflow.ellipsis,
                 ),
-                Icon(
-                  isLow ? Icons.warning_amber_rounded : Icons.edit_outlined,
-                  size: 16,
-                  color: Colors.white70,
-                ),
-              ],
-            ),
-            const Spacer(),
-            Row(
-              children: [
-                const Icon(Icons.inventory_2_outlined, size: 14, color: Colors.white70),
-                const SizedBox(width: 4),
-                Flexible(
-                  child: Text(
-                    'Qty: $quantity',
-                    style: const TextStyle(fontSize: 13, color: Colors.white),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                const Icon(Icons.calendar_today_outlined, size: 14, color: Colors.white70),
-                const SizedBox(width: 4),
-                Flexible(
-                  child: Text(
-                    item['purchasedDate']?.split('T')[0] ?? 'N/A',
-                    style: const TextStyle(fontSize: 12, color: Colors.white70),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+              ),
+              if (isLow) const StatusPill('Low', color: AppColors.warning),
+            ],
+          ),
+        ],
       ),
     );
   }
 }
 
-Widget _sectionLabel(String text) => Text(
-      text.toUpperCase(),
-      style: TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w700,
-        color: Colors.grey.shade500,
-        letterSpacing: 1.1,
-      ),
+Widget _sectionLabel(String text) => Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Text(text.toUpperCase(), style: AppText.eyebrow),
     );

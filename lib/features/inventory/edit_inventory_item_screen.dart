@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:odon_booking/shared/widgets/odon_ui.dart';
 import 'package:intl/intl.dart';
 import 'package:odon_booking/core/api/api_service.dart';
 
 class EditInventoryItemScreen extends StatefulWidget {
   final Map<String, dynamic> item;
 
-  const EditInventoryItemScreen({Key? key, required this.item}) : super(key: key);
+  const EditInventoryItemScreen({Key? key, required this.item})
+      : super(key: key);
 
   @override
-  _EditInventoryItemScreenState createState() => _EditInventoryItemScreenState();
+  _EditInventoryItemScreenState createState() =>
+      _EditInventoryItemScreenState();
 }
 
 class _EditInventoryItemScreenState extends State<EditInventoryItemScreen> {
@@ -16,7 +19,8 @@ class _EditInventoryItemScreenState extends State<EditInventoryItemScreen> {
   final TextEditingController _itemNameController = TextEditingController();
   final TextEditingController _quantityController = TextEditingController();
   final TextEditingController _addQuantityController = TextEditingController();
-  final TextEditingController _removeQuantityController = TextEditingController();
+  final TextEditingController _removeQuantityController =
+      TextEditingController();
   DateTime? _purchasedDate;
   final ApiService _apiService = ApiService();
 
@@ -56,7 +60,8 @@ class _EditInventoryItemScreenState extends State<EditInventoryItemScreen> {
   }
 
   void _removeQuantity() {
-    final removeAmount = int.tryParse(_removeQuantityController.text.trim()) ?? 0;
+    final removeAmount =
+        int.tryParse(_removeQuantityController.text.trim()) ?? 0;
     if (removeAmount > 0) {
       if (removeAmount <= currentQuantity) {
         setState(() {
@@ -69,7 +74,8 @@ class _EditInventoryItemScreenState extends State<EditInventoryItemScreen> {
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cannot remove more items than available')),
+          const SnackBar(
+              content: Text('Cannot remove more items than available')),
         );
       }
     }
@@ -110,7 +116,8 @@ class _EditInventoryItemScreenState extends State<EditInventoryItemScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Item'),
-        content: Text('Are you sure you want to delete "${_itemNameController.text}"?'),
+        content: Text(
+            'Are you sure you want to delete "${_itemNameController.text}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -118,7 +125,7 @@ class _EditInventoryItemScreenState extends State<EditInventoryItemScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
             child: const Text('Delete'),
           ),
         ],
@@ -152,249 +159,172 @@ class _EditInventoryItemScreenState extends State<EditInventoryItemScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          "Edit Inventory Item",
-          style: TextStyle(
-            color: Colors.white,
-            fontFamily: 'Outfit',
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: Colors.indigo,
-        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text('Edit item'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.delete, color: Colors.white),
+            tooltip: 'Delete item',
+            icon: const Icon(Icons.delete_outline_rounded),
             onPressed: _isLoading ? null : _deleteItem,
           ),
+          const SizedBox(width: 4),
         ],
       ),
       body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.only(top: 16, bottom: 32),
+        child: PageBody(
+          maxWidth: AppLayout.maxForm,
           child: Form(
             key: _formKey,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(
-                  'Edit Item Details',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 16),
-
-                // Item Name Field
-                TextFormField(
-                  controller: _itemNameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Item Name',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter the item name';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-
-                // Current Quantity Display
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.indigo.shade50,
-                    border: Border.all(color: Colors.indigo.shade200),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+                // Current quantity — the number this screen is about.
+                SurfaceCard(
+                  padding: const EdgeInsets.all(20),
                   child: Row(
                     children: [
-                      const Icon(Icons.inventory_2, color: Colors.indigo),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Current Quantity: $currentQuantity',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.indigo,
-                        ),
+                      Expanded(
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('In stock', style: AppText.footnote),
+                              const SizedBox(height: 4),
+                              AnimatedSwitcher(
+                                duration: AppMotion.base,
+                                child: Text('$currentQuantity',
+                                    key: ValueKey(currentQuantity),
+                                    style: AppText.number(40)),
+                              ),
+                            ]),
                       ),
+                      const IconWell(Icons.inventory_2_outlined, size: 48),
                     ],
                   ),
                 ),
                 const SizedBox(height: 16),
 
-                // Quick Add Section
                 Card(
-                  color: Colors.green.shade50,
                   child: Padding(
                     padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Add Items',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.green,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextFormField(
-                                controller: _addQuantityController,
-                                decoration: const InputDecoration(
-                                  labelText: 'Quantity to Add',
-                                  border: OutlineInputBorder(),
-                                ),
-                                keyboardType: TextInputType.number,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            ElevatedButton(
-                              onPressed: _addQuantity,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                foregroundColor: Colors.white,
-                              ),
-                              child: const Text('Add'),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Quick Remove Section
-                Card(
-                  color: Colors.red.shade50,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Remove Items',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.red,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextFormField(
-                                controller: _removeQuantityController,
-                                decoration: const InputDecoration(
-                                  labelText: 'Quantity to Remove',
-                                  border: OutlineInputBorder(),
-                                ),
-                                keyboardType: TextInputType.number,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            ElevatedButton(
-                              onPressed: _removeQuantity,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red,
-                                foregroundColor: Colors.white,
-                              ),
-                              child: const Text('Remove'),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Direct Quantity Edit
-                TextFormField(
-                  controller: _quantityController,
-                  decoration: const InputDecoration(
-                    labelText: 'Set Total Quantity',
-                    border: OutlineInputBorder(),
-                    helperText: 'Or directly set the total quantity',
-                  ),
-                  keyboardType: TextInputType.number,
-                  onChanged: (value) {
-                    final newQuantity = int.tryParse(value) ?? 0;
-                    setState(() {
-                      currentQuantity = newQuantity;
-                    });
-                  },
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter the quantity';
-                    }
-                    if (int.tryParse(value) == null || int.parse(value) < 0) {
-                      return 'Please enter a valid quantity';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-
-                // Purchase Date
-                ListTile(
-                  title: Text(
-                    _purchasedDate == null
-                        ? 'Select Purchase Date'
-                        : 'Purchased Date: ${DateFormat('yyyy-MM-dd').format(_purchasedDate!)}',
-                  ),
-                  trailing: const Icon(Icons.calendar_today),
-                  onTap: () async {
-                    final selectedDate = await showDatePicker(
-                      context: context,
-                      initialDate: _purchasedDate ?? DateTime.now(),
-                      firstDate: DateTime(2000),
-                      lastDate: DateTime.now(),
-                    );
-                    if (selectedDate != null) {
-                      setState(() {
-                        _purchasedDate = selectedDate;
-                      });
-                    }
-                  },
-                ),
-                const SizedBox(height: 24),
-
-                // Update Button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _updateItem,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.indigo,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                    child: Column(children: [
+                      TextFormField(
+                        controller: _itemNameController,
+                        decoration: fieldDecoration('Item name',
+                            icon: Icons.label_outline_rounded),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Enter the item name';
+                          }
+                          return null;
+                        },
                       ),
-                    ),
-                    child: _isLoading
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : const Text(
-                      'Update Item',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _quantityController,
+                        decoration: fieldDecoration('Set total quantity',
+                            icon: Icons.numbers_rounded,
+                            helper: 'Or adjust with add / remove below'),
+                        keyboardType: TextInputType.number,
+                        onChanged: (value) {
+                          final newQuantity = int.tryParse(value) ?? 0;
+                          setState(() {
+                            currentQuantity = newQuantity;
+                          });
+                        },
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Enter the quantity';
+                          }
+                          if (int.tryParse(value) == null ||
+                              int.parse(value) < 0) {
+                            return 'Enter a valid quantity';
+                          }
+                          return null;
+                        },
                       ),
-                    ),
+                      const SizedBox(height: 12),
+                      ListTile(
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 4),
+                        leading: const Icon(Icons.calendar_today_outlined),
+                        title: Text(_purchasedDate == null
+                            ? 'Select purchase date'
+                            : 'Bought ${DateFormat('d MMM yyyy').format(_purchasedDate!)}'),
+                        trailing: const Icon(Icons.chevron_right_rounded,
+                            color: AppColors.ink4),
+                        onTap: () async {
+                          final selectedDate = await showDatePicker(
+                            context: context,
+                            initialDate: _purchasedDate ?? DateTime.now(),
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime.now(),
+                          );
+                          if (selectedDate != null) {
+                            setState(() {
+                              _purchasedDate = selectedDate;
+                            });
+                          }
+                        },
+                      ),
+                    ]),
                   ),
+                ),
+                const SizedBox(height: 16),
+
+                Row(
+                  children: [
+                    Expanded(
+                        child: _adjustCard('Add', _addQuantityController,
+                            Icons.add_rounded, _addQuantity)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                        child: _adjustCard('Remove', _removeQuantityController,
+                            Icons.remove_rounded, _removeQuantity)),
+                  ],
+                ),
+                const SizedBox(height: 28),
+
+                FilledButton(
+                  onPressed: _isLoading ? null : _updateItem,
+                  style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(52)),
+                  child: _isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2),
+                        )
+                      : const Text('Save changes'),
                 ),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  /// Small card with a quantity field and its action, for quick stock moves.
+  Widget _adjustCard(String verb, TextEditingController controller,
+      IconData icon, VoidCallback onPressed) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          TextFormField(
+            controller: controller,
+            decoration: fieldDecoration('$verb qty'),
+            keyboardType: TextInputType.number,
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: onPressed,
+            icon: Icon(icon, size: 18),
+            label: Text(verb),
+          ),
+        ]),
       ),
     );
   }

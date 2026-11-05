@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:odon_booking/shared/widgets/odon_ui.dart';
 
 import 'auth_gate.dart';
 
@@ -64,100 +65,58 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final reduced = AppMotion.reduced(context);
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
-      body: Center(
-        child: SingleChildScrollView(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 400),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 84,
-                    height: 84,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Icon(Icons.hotel_rounded,
-                        color: Color(0xFF6366F1), size: 44),
-                  ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'ODON Dashboard',
-                    style: TextStyle(
-                      fontFamily: 'Outfit',
-                      color: Colors.white,
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Sign in to continue',
-                    style: TextStyle(color: Color(0xFF94A3B8), fontSize: 15),
-                  ),
-                  const SizedBox(height: 32),
-                  if (_error != null) ...[
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 380),
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: reduced ? 1 : 0, end: 1),
+                duration: AppMotion.slow,
+                curve: AppMotion.ease,
+                builder: (_, t, child) => Opacity(
+                  opacity: t,
+                  child: Transform.translate(offset: Offset(0, (1 - t) * 12), child: child),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                     Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEF4444).withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                            color:
-                                const Color(0xFFEF4444).withValues(alpha: 0.4)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.error_outline,
-                              color: Color(0xFFEF4444), size: 20),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              _error!,
-                              style: const TextStyle(
-                                  color: Color(0xFFFCA5A5), fontSize: 13),
-                            ),
-                          ),
-                        ],
-                      ),
+                      decoration: const BoxDecoration(shape: BoxShape.circle, boxShadow: AppShadow.float),
+                      child: const BrandSeal(size: 112),
                     ),
-                    const SizedBox(height: 20),
-                  ],
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: FilledButton.icon(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: const Color(0xFF1F2937),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
+                    const SizedBox(height: 28),
+                    Text('The Odon', style: AppText.largeTitle.copyWith(fontSize: 34)),
+                    const SizedBox(height: 6),
+                    Text('Front desk and office', style: AppText.callout.copyWith(fontSize: 15)),
+                    const SizedBox(height: 36),
+                    if (_error != null) ...[
+                      InlineBanner(_error!, tone: BannerTone.warning),
+                      const SizedBox(height: 16),
+                    ],
+                    FilledButton.icon(
+                      style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(54)),
                       onPressed: _busy ? null : _signInWithGoogle,
                       icon: _busy
                           ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                             )
-                          : const Icon(Icons.login, size: 22),
-                      label: Text(_busy ? 'Signing in…' : 'Sign in with Google'),
+                          : const Icon(Icons.login_rounded, size: 20),
+                      label: Text(_busy ? 'Signing in…' : 'Continue with Google'),
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Access is restricted to authorised hotel staff only.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
-                  ),
-                ],
+                    const SizedBox(height: 20),
+                    Text(
+                      'For hotel staff. Use the Google account the owner added for you.',
+                      textAlign: TextAlign.center,
+                      style: AppText.footnote,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

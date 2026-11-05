@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:odon_booking/shared/widgets/odon_ui.dart';
 import 'package:flutter/services.dart';
 
 class DataConfirmationDialog extends StatefulWidget {
@@ -28,11 +29,7 @@ class _DataConfirmationDialogState extends State<DataConfirmationDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text(
-        'Confirm Extracted Data',
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-          color: Color(0xFFEF4444),
-        ),
+        'Check what was read',
       ),
       content: Container(
         width: double.maxFinite,
@@ -41,7 +38,7 @@ class _DataConfirmationDialogState extends State<DataConfirmationDialog> {
           children: [
             Text(
               'AI extracted ${items.length} item${items.length > 1 ? 's' : ''}. Review, categorize, and edit if needed:',
-              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+              style: TextStyle(fontSize: 14, color: AppColors.ink3),
             ),
             SizedBox(height: 16),
             Expanded(
@@ -63,8 +60,7 @@ class _DataConfirmationDialogState extends State<DataConfirmationDialog> {
                                     selectedItems[index] = value ?? false;
                                   });
                                 },
-                                activeColor: Color(0xFFEF4444),
-                              ),
+                                                              ),
                               Expanded(
                                 child: Text(
                                   items[index].itemName,
@@ -75,7 +71,7 @@ class _DataConfirmationDialogState extends State<DataConfirmationDialog> {
                                 ),
                               ),
                               IconButton(
-                                icon: Icon(Icons.edit, color: Color(0xFFEF4444)),
+                                icon: const Icon(Icons.edit_outlined, color: AppColors.ink2),
                                 onPressed: () => _editItem(index),
                               ),
                             ],
@@ -99,10 +95,6 @@ class _DataConfirmationDialogState extends State<DataConfirmationDialog> {
         ),
         ElevatedButton(
           onPressed: _getSelectedCount() > 0 ? _confirmData : null,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Color(0xFFEF4444),
-            foregroundColor: Colors.white,
-          ),
           child: Text('Add ${_getSelectedCount()} Item${_getSelectedCount() > 1 ? 's' : ''}'),
         ),
       ],
@@ -135,7 +127,7 @@ class _DataConfirmationDialogState extends State<DataConfirmationDialog> {
               '$label:',
               style: TextStyle(
                 fontWeight: FontWeight.w500,
-                color: Colors.grey[600],
+                color: AppColors.ink3,
               ),
             ),
           ),
@@ -143,10 +135,10 @@ class _DataConfirmationDialogState extends State<DataConfirmationDialog> {
             child: Container(
               padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: value == 'Salary' ? Colors.green[50] : Colors.blue[50],
-                borderRadius: BorderRadius.circular(4),
+                color: value == 'Salary' ? AppColors.successSoft : AppColors.infoSoft,
+                borderRadius: BorderRadius.circular(6),
                 border: Border.all(
-                  color: value == 'Salary' ? Colors.green[200]! : Colors.blue[200]!,
+                  color: value == 'Salary' ? AppColors.successLine : AppColors.infoLine,
                   width: 1,
                 ),
               ),
@@ -154,7 +146,7 @@ class _DataConfirmationDialogState extends State<DataConfirmationDialog> {
                 value,
                 style: TextStyle(
                   fontSize: 14,
-                  color: value == 'Salary' ? Colors.green[700] : Colors.blue[700],
+                  color: value == 'Salary' ? AppColors.success : AppColors.info,
                   fontWeight: label == 'Type' ? FontWeight.w600 : FontWeight.normal,
                 ),
               ),
@@ -179,7 +171,7 @@ class _DataConfirmationDialogState extends State<DataConfirmationDialog> {
               'Date:',
               style: TextStyle(
                 fontWeight: FontWeight.w500,
-                color: Colors.grey[600],
+                color: AppColors.ink3,
               ),
             ),
           ),
@@ -189,10 +181,10 @@ class _DataConfirmationDialogState extends State<DataConfirmationDialog> {
               child: Container(
                 padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.orange[50],
-                  borderRadius: BorderRadius.circular(4),
+                  color: AppColors.warningSoft,
+                  borderRadius: BorderRadius.circular(6),
                   border: Border.all(
-                    color: Colors.orange[200]!,
+                    color: AppColors.warningLine,
                     width: 1,
                   ),
                 ),
@@ -202,14 +194,14 @@ class _DataConfirmationDialogState extends State<DataConfirmationDialog> {
                     Icon(
                       Icons.calendar_today,
                       size: 16,
-                      color: Colors.orange[700],
+                      color: AppColors.warning,
                     ),
                     SizedBox(width: 6),
                     Text(
                       formattedDate,
                       style: TextStyle(
                         fontSize: 14,
-                        color: Colors.orange[700],
+                        color: AppColors.warning,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -217,7 +209,7 @@ class _DataConfirmationDialogState extends State<DataConfirmationDialog> {
                     Icon(
                       Icons.edit,
                       size: 14,
-                      color: Colors.orange[600],
+                      color: AppColors.warning,
                     ),
                   ],
                 ),
@@ -246,20 +238,6 @@ class _DataConfirmationDialogState extends State<DataConfirmationDialog> {
       initialDate: currentDate,
       firstDate: DateTime(2020),
       lastDate: DateTime.now().add(Duration(days: 365)),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: Color(0xFFEF4444), // Your app's primary color
-              onPrimary: Colors.white,
-              surface: Colors.white,
-              onSurface: Colors.black,
-            ),
-            dialogBackgroundColor: Colors.white,
-          ),
-          child: child!,
-        );
-      },
     );
 
     if (selectedDate != null && selectedDate != currentDate) {
@@ -284,9 +262,7 @@ class _DataConfirmationDialogState extends State<DataConfirmationDialog> {
               Text('Date updated successfully!'),
             ],
           ),
-          backgroundColor: Colors.green,
           duration: Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
           ),
@@ -392,11 +368,8 @@ class _EditItemDialogState extends State<_EditItemDialog> {
               value: selectedType,
               decoration: InputDecoration(
                 labelText: 'Item Type',
-                border: OutlineInputBorder(),
                 prefixIcon: Icon(
-                  selectedType == 'Salary' ? Icons.person : Icons.receipt,
-                  color: selectedType == 'Salary' ? Colors.green : Colors.blue,
-                ),
+                  selectedType == 'Salary' ? Icons.person : Icons.receipt),
               ),
               items: itemTypes.map((type) => DropdownMenuItem(
                 value: type,
@@ -425,7 +398,6 @@ class _EditItemDialogState extends State<_EditItemDialog> {
               controller: nameController,
               decoration: InputDecoration(
                 labelText: selectedType == 'Salary' ? 'Employee Name' : 'Expense Name',
-                border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.label_outline),
               ),
             ),
@@ -436,7 +408,6 @@ class _EditItemDialogState extends State<_EditItemDialog> {
               value: selectedCategory,
               decoration: InputDecoration(
                 labelText: 'Category',
-                border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.category),
               ),
               items: (selectedType == 'Salary' ? salaryCategories : expenseCategories)
@@ -457,7 +428,6 @@ class _EditItemDialogState extends State<_EditItemDialog> {
               ],
               decoration: InputDecoration(
                 labelText: 'Amount',
-                border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.attach_money),
               ),
             ),
@@ -469,12 +439,12 @@ class _EditItemDialogState extends State<_EditItemDialog> {
               child: Container(
                 padding: EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey[400]!),
-                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: AppColors.hairlineStrong),
+                  borderRadius: AppRadius.control,
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.calendar_today, color: Color(0xFFEF4444)),
+                    const Icon(Icons.calendar_today_outlined, color: AppColors.ink3),
                     SizedBox(width: 12),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -483,7 +453,7 @@ class _EditItemDialogState extends State<_EditItemDialog> {
                           'Date',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey[600],
+                            color: AppColors.ink3,
                           ),
                         ),
                         Text(
@@ -496,7 +466,7 @@ class _EditItemDialogState extends State<_EditItemDialog> {
                       ],
                     ),
                     Spacer(),
-                    Icon(Icons.edit, color: Colors.grey[600], size: 18),
+                    Icon(Icons.edit, color: AppColors.ink3, size: 18),
                   ],
                 ),
               ),
@@ -509,7 +479,6 @@ class _EditItemDialogState extends State<_EditItemDialog> {
               maxLines: 2,
               decoration: InputDecoration(
                 labelText: 'Description/Notes',
-                border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.notes),
               ),
             ),
@@ -523,10 +492,6 @@ class _EditItemDialogState extends State<_EditItemDialog> {
         ),
         ElevatedButton(
           onPressed: _saveChanges,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Color(0xFFEF4444),
-            foregroundColor: Colors.white,
-          ),
           child: Text('Save'),
         ),
       ],
@@ -539,20 +504,6 @@ class _EditItemDialogState extends State<_EditItemDialog> {
       initialDate: selectedDate,
       firstDate: DateTime(2020),
       lastDate: DateTime.now().add(Duration(days: 365)),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: Color(0xFFEF4444),
-              onPrimary: Colors.white,
-              surface: Colors.white,
-              onSurface: Colors.black,
-            ),
-            dialogBackgroundColor: Colors.white,
-          ),
-          child: child!,
-        );
-      },
     );
 
     if (picked != null && picked != selectedDate) {

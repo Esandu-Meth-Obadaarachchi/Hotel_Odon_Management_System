@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:odon_booking/shared/widgets/odon_ui.dart';
 import 'package:odon_booking/core/api/api_service.dart';
 
 /// Owner-only screen for granting and revoking dashboard access.
@@ -44,8 +45,10 @@ class _UserAccessScreenState extends State<UserAccessScreen> {
       final data = await _api.fetchAccessList();
       if (!mounted) return;
       setState(() {
-        _emails = List<String>.from((data['emails'] as List? ?? []).map((e) => '$e'));
-        _owners = List<String>.from((data['owners'] as List? ?? []).map((e) => '$e'));
+        _emails =
+            List<String>.from((data['emails'] as List? ?? []).map((e) => '$e'));
+        _owners =
+            List<String>.from((data['owners'] as List? ?? []).map((e) => '$e'));
         _loading = false;
       });
     } catch (e) {
@@ -69,8 +72,10 @@ class _UserAccessScreenState extends State<UserAccessScreen> {
       final data = await _api.addAllowedEmail(email);
       if (!mounted) return;
       setState(() {
-        _emails = List<String>.from((data['emails'] as List? ?? []).map((e) => '$e'));
-        _owners = List<String>.from((data['owners'] as List? ?? []).map((e) => '$e'));
+        _emails =
+            List<String>.from((data['emails'] as List? ?? []).map((e) => '$e'));
+        _owners =
+            List<String>.from((data['owners'] as List? ?? []).map((e) => '$e'));
         _busy = false;
       });
       _emailController.clear();
@@ -99,7 +104,7 @@ class _UserAccessScreenState extends State<UserAccessScreen> {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade600),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Remove'),
           ),
@@ -116,8 +121,10 @@ class _UserAccessScreenState extends State<UserAccessScreen> {
       final data = await _api.removeAllowedEmail(email);
       if (!mounted) return;
       setState(() {
-        _emails = List<String>.from((data['emails'] as List? ?? []).map((e) => '$e'));
-        _owners = List<String>.from((data['owners'] as List? ?? []).map((e) => '$e'));
+        _emails =
+            List<String>.from((data['emails'] as List? ?? []).map((e) => '$e'));
+        _owners =
+            List<String>.from((data['owners'] as List? ?? []).map((e) => '$e'));
         _busy = false;
       });
       _toast('$email can no longer sign in');
@@ -135,36 +142,31 @@ class _UserAccessScreenState extends State<UserAccessScreen> {
   void _toast(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+      SnackBar(content: Text(message)),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
-        title: const Text(
-          'User Access',
-          style: TextStyle(
-              color: Colors.white, fontFamily: 'Outfit', fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: Colors.indigo,
-        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text('User access'),
         actions: [
           IconButton(
             tooltip: 'Reload',
             onPressed: _loading ? null : _load,
-            icon: const Icon(Icons.refresh, color: Colors.white),
+            icon: const Icon(Icons.refresh_rounded),
           ),
+          const SizedBox(width: 4),
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const LoadingView()
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                padding: AppLayout.sliverPadding(context,
+                    maxWidth: AppLayout.maxForm, top: 16, bottom: 32),
                 children: [
                   _intro(),
                   const SizedBox(height: 16),
@@ -173,66 +175,37 @@ class _UserAccessScreenState extends State<UserAccessScreen> {
                     const SizedBox(height: 12),
                     _errorBanner(_error!),
                   ],
-                  const SizedBox(height: 20),
-                  Text(
-                    'WHO CAN SIGN IN (${_emails.length})',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF64748B),
-                      letterSpacing: 0.6,
+                  FormSectionLabel('Who can sign in · ${_emails.length}'),
+                  if (_emails.isNotEmpty)
+                    SurfaceCard(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Column(children: [
+                        for (var i = 0; i < _emails.length; i++) ...[
+                          if (i > 0)
+                            const Padding(
+                                padding: EdgeInsets.only(left: 64),
+                                child: Divider()),
+                          _row(_emails[i]),
+                        ],
+                      ]),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  ..._emails.map(_row),
                 ],
               ),
             ),
     );
   }
 
-  Widget _intro() => Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.indigo.shade50,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.indigo.shade100),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(Icons.info_outline, size: 18, color: Colors.indigo.shade400),
-            const SizedBox(width: 10),
-            const Expanded(
-              child: Text(
-                'Only these Google accounts can sign in. Changes apply within a '
-                'minute — no new app version needed. Every booking records the '
-                'account that created and last edited it.',
-                style: TextStyle(fontSize: 13, color: Color(0xFF334155), height: 1.4),
-              ),
-            ),
-          ],
-        ),
+  Widget _intro() => const InlineBanner(
+        'Only these Google accounts can sign in. Changes apply within a minute. '
+        'Every booking records who created and last edited it.',
       );
 
-  Widget _addCard() => Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 8,
-                offset: const Offset(0, 2)),
-          ],
-        ),
+  Widget _addCard() => SurfaceCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Add a person',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-            const SizedBox(height: 10),
+            Text('Add a person', style: AppText.headline),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
@@ -242,109 +215,70 @@ class _UserAccessScreenState extends State<UserAccessScreen> {
                     keyboardType: TextInputType.emailAddress,
                     autocorrect: false,
                     onSubmitted: (_) => _busy ? null : _add(),
-                    decoration: InputDecoration(
-                      hintText: 'name@gmail.com',
-                      isDense: true,
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                    ),
+                    decoration: fieldDecoration('Google account',
+                        hint: 'name@gmail.com',
+                        icon: Icons.alternate_email_rounded),
                   ),
                 ),
                 const SizedBox(width: 10),
                 FilledButton.icon(
                   onPressed: _busy ? null : _add,
+                  style: FilledButton.styleFrom(minimumSize: const Size(0, 52)),
                   icon: _busy
                       ? const SizedBox(
                           width: 14,
                           height: 14,
                           child: CircularProgressIndicator(
                               strokeWidth: 2, color: Colors.white))
-                      : const Icon(Icons.add, size: 18),
+                      : const Icon(Icons.add_rounded, size: 18),
                   label: const Text('Add'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Colors.indigo,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                  ),
                 ),
               ],
             ),
             const SizedBox(height: 8),
-            const Text(
-              'It must be the Google account they sign in with, spelled exactly.',
-              style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-            ),
+            Text('Use the exact Google account they sign in with.',
+                style: AppText.footnote),
           ],
         ),
       );
 
-  Widget _errorBanner(String message) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.red.shade50,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.red.shade200),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.error_outline, size: 18, color: Colors.red.shade400),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(message,
-                  style: TextStyle(fontSize: 13, color: Colors.red.shade700)),
-            ),
-          ],
-        ),
-      );
+  Widget _errorBanner(String message) =>
+      InlineBanner(message, tone: BannerTone.warning);
 
   Widget _row(String email) {
     final isOwner = _owners.contains(email);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-            color: isOwner ? Colors.indigo.shade100 : const Color(0xFFE2E8F0)),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 16,
-            backgroundColor:
-                isOwner ? Colors.indigo.shade50 : const Color(0xFFF1F5F9),
-            child: Icon(
-              isOwner ? Icons.shield_rounded : Icons.person_outline,
-              size: 16,
-              color: isOwner ? Colors.indigo : const Color(0xFF64748B),
-            ),
-          ),
+          InitialsAvatar(
+              email.split('@').first.replaceAll(RegExp(r'[._]'), ' '),
+              size: 36),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(email,
-                    style: const TextStyle(
-                        fontSize: 14, fontWeight: FontWeight.w500)),
+                    style: AppText.bodyStrong.copyWith(fontSize: 14),
+                    overflow: TextOverflow.ellipsis),
                 if (isOwner)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 2),
-                    child: Text('Owner — cannot be removed',
-                        style: TextStyle(fontSize: 11, color: Colors.indigo)),
-                  ),
+                  Text('Owner · can\'t be removed',
+                      style: AppText.footnote.copyWith(fontSize: 12)),
               ],
             ),
           ),
-          if (!isOwner)
+          if (isOwner)
+            const Padding(
+              padding: EdgeInsets.only(right: 8),
+              child: StatusPill('Owner', icon: Icons.shield_outlined),
+            )
+          else
             IconButton(
               tooltip: 'Remove access',
               onPressed: _busy ? null : () => _remove(email),
-              icon: Icon(Icons.delete_outline, size: 20, color: Colors.red.shade400),
+              icon: const Icon(Icons.remove_circle_outline_rounded,
+                  size: 20, color: AppColors.ink3),
             ),
         ],
       ),

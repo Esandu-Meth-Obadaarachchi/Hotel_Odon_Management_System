@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:odon_booking/shared/widgets/odon_ui.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'ai_insights_service.dart';
 
@@ -89,21 +90,12 @@ class _AiInsightsPageState extends State<AiInsightsPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: Text(
-          "🤖 AI Business Insights",
-          style: GoogleFonts.montserrat(
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
-          ),
-        ),
-        backgroundColor: Colors.deepPurple,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text('Business insights'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            tooltip: 'Run again',
+            icon: const Icon(Icons.refresh_rounded),
             onPressed: _isLoading ? null : () {
               setState(() {
                 _isLoading = true;
@@ -112,6 +104,7 @@ class _AiInsightsPageState extends State<AiInsightsPage>
               _generateInsights();
             },
           ),
+          const SizedBox(width: 4),
         ],
       ),
       body: _isLoading
@@ -124,42 +117,19 @@ class _AiInsightsPageState extends State<AiInsightsPage>
 
   Widget _buildLoadingView() {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              SizedBox(
-                width: 80,
-                height: 80,
-                child: CircularProgressIndicator(
-                  strokeWidth: 3,
-                  valueColor: AlwaysStoppedAnimation(Colors.deepPurple),
-                ),
-              ),
-              Icon(Icons.psychology, size: 40, color: Colors.deepPurple),
-            ],
-          ),
-          const SizedBox(height: 24),
-          Text(
-            "🧠 AI is analyzing your business data...",
-            style: GoogleFonts.montserrat(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Colors.deepPurple,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            "Discovering insights that would take hours to find manually",
-            style: GoogleFonts.montserrat(
-              fontSize: 14,
-              color: Colors.grey[600],
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(width: 28, height: 28, child: CircularProgressIndicator(strokeWidth: 2)),
+            const SizedBox(height: 20),
+            Text('Reading this period\'s numbers…', style: AppText.headline),
+            const SizedBox(height: 6),
+            Text('Bookings, meals, expenses and salaries are being compared.',
+                style: AppText.callout, textAlign: TextAlign.center),
+          ],
+        ),
       ),
     );
   }
@@ -169,20 +139,20 @@ class _AiInsightsPageState extends State<AiInsightsPage>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.error_outline, size: 80, color: Colors.red[400]),
+          Icon(Icons.error_outline, size: 80, color: AppColors.danger),
           const SizedBox(height: 16),
           Text(
             "Oops! Something went wrong",
-            style: GoogleFonts.montserrat(
+            style: GoogleFonts.hankenGrotesk(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: Colors.red[700],
+              color: AppColors.danger,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             _error!,
-            style: GoogleFonts.montserrat(color: Colors.grey[600]),
+            style: GoogleFonts.hankenGrotesk(color: AppColors.ink3),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
@@ -197,7 +167,7 @@ class _AiInsightsPageState extends State<AiInsightsPage>
             icon: const Icon(Icons.refresh),
             label: const Text("Try Again"),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.deepPurple,
+              backgroundColor: AppColors.ink,
               foregroundColor: Colors.white,
             ),
           ),
@@ -210,7 +180,7 @@ class _AiInsightsPageState extends State<AiInsightsPage>
     return FadeTransition(
       opacity: _fadeAnimation,
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: AppLayout.sliverPadding(context, maxWidth: AppLayout.maxForm, top: 16, bottom: 40),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -253,79 +223,49 @@ class _AiInsightsPageState extends State<AiInsightsPage>
 
     switch (health.toLowerCase()) {
       case 'excellent':
-        healthColor = Colors.green;
+        healthColor = AppColors.success;
         healthIcon = Icons.trending_up;
         break;
       case 'good':
-        healthColor = Colors.blue;
+        healthColor = AppColors.info;
         healthIcon = Icons.thumb_up;
         break;
       case 'fair':
-        healthColor = Colors.orange;
+        healthColor = AppColors.warning;
         healthIcon = Icons.warning;
         break;
       default:
-        healthColor = Colors.red;
+        healthColor = AppColors.danger;
         healthIcon = Icons.trending_down;
     }
 
-    return Container(
-      width: double.infinity,
+    final scoreNum = (score is num ? score : num.tryParse('$score') ?? 0).toDouble();
+    return SurfaceCard(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: LinearGradient(
-          colors: [healthColor.withOpacity(0.8), healthColor.withOpacity(0.6)],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: healthColor.withOpacity(0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Business Health",
-                    style: GoogleFonts.montserrat(
-                      fontSize: 16,
-                      color: Colors.white70,
-                    ),
-                  ),
-                  Text(
-                    health,
-                    style: GoogleFonts.montserrat(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('BUSINESS HEALTH', style: AppText.eyebrow),
+                    const SizedBox(height: 6),
+                    Text('$health', style: AppText.largeTitle.copyWith(color: healthColor)),
+                  ],
+                ),
               ),
-              Column(
-                children: [
-                  Icon(healthIcon, size: 40, color: Colors.white),
-                  const SizedBox(height: 8),
-                  Text(
-                    "$score/100",
-                    style: GoogleFonts.montserrat(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
+              IconWell(healthIcon, color: healthColor, size: 48),
             ],
           ),
+          const SizedBox(height: 18),
+          Row(children: [
+            Expanded(child: ProportionBar(scoreNum / 100, color: healthColor)),
+            const SizedBox(width: 12),
+            Text('${scoreNum.round()}/100', style: AppText.number(14)),
+          ]),
         ],
       ),
     );
@@ -335,25 +275,25 @@ class _AiInsightsPageState extends State<AiInsightsPage>
     final insights = _insights!['keyInsights'] as List? ?? [];
 
     return _buildSection(
-      title: "💡 Key Insights",
+      title: "Key insights",
       child: Column(
         children: insights.map<Widget>((insight) {
           return Container(
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.blue[50],
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(12),
 
             ),
             child: Row(
               children: [
-                Icon(Icons.lightbulb, color: Colors.blue[700]),
+                Icon(Icons.lightbulb, color: AppColors.info),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     insight.toString(),
-                    style: GoogleFonts.montserrat(fontSize: 14),
+                    style: GoogleFonts.hankenGrotesk(fontSize: 14),
                   ),
                 ),
               ],
@@ -370,21 +310,21 @@ class _AiInsightsPageState extends State<AiInsightsPage>
     if (issues.isEmpty) return const SizedBox.shrink();
 
     return _buildSection(
-      title: "🚨 Critical Issues",
+      title: "Critical issues",
       child: Column(
         children: issues.map<Widget>((issue) {
           final urgency = issue['urgency'] ?? 'Medium';
           Color urgencyColor = urgency == 'High'
-              ? Colors.red
+              ? AppColors.danger
               : urgency == 'Medium'
-              ? Colors.orange
-              : Colors.yellow[700]!;
+              ? AppColors.warning
+              : AppColors.warning;
 
           return Container(
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.red[50],
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(12),
 
             ),
@@ -398,7 +338,7 @@ class _AiInsightsPageState extends State<AiInsightsPage>
                     Expanded(
                       child: Text(
                         issue['issue'].toString(),
-                        style: GoogleFonts.montserrat(
+                        style: GoogleFonts.hankenGrotesk(
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
                         ),
@@ -413,7 +353,7 @@ class _AiInsightsPageState extends State<AiInsightsPage>
                       ),
                       child: Text(
                         urgency,
-                        style: GoogleFonts.montserrat(
+                        style: GoogleFonts.hankenGrotesk(
                           color: Colors.white,
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -425,9 +365,9 @@ class _AiInsightsPageState extends State<AiInsightsPage>
                 const SizedBox(height: 8),
                 Text(
                   issue['impact'].toString(),
-                  style: GoogleFonts.montserrat(
+                  style: GoogleFonts.hankenGrotesk(
                     fontSize: 13,
-                    color: Colors.grey[700],
+                    color: AppColors.ink2,
                   ),
                 ),
               ],
@@ -443,35 +383,35 @@ class _AiInsightsPageState extends State<AiInsightsPage>
         {};
 
     return _buildSection(
-      title: "💰 Revenue Analysis",
+      title: "Revenue analysis",
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildAnalysisCard(
             title: "Summary",
             content: analysis['summary']?.toString() ?? '',
-            color: Colors.green,
+            color: AppColors.success,
             icon: Icons.assessment,
           ),
           const SizedBox(height: 12),
           _buildAnalysisLists(
             "Strengths",
             analysis['strengths'] as List? ?? [],
-            Colors.green,
+            AppColors.success,
             Icons.trending_up,
           ),
           const SizedBox(height: 12),
           _buildAnalysisLists(
             "Concerns",
             analysis['concerns'] as List? ?? [],
-            Colors.orange,
+            AppColors.warning,
             Icons.warning,
           ),
           const SizedBox(height: 12),
           _buildAnalysisLists(
             "Opportunities",
             analysis['opportunities'] as List? ?? [],
-            Colors.blue,
+            AppColors.info,
             Icons.lightbulb,
           ),
         ],
@@ -484,35 +424,35 @@ class _AiInsightsPageState extends State<AiInsightsPage>
         {};
 
     return _buildSection(
-      title: "📊 Expense Analysis",
+      title: "Expense analysis",
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildAnalysisCard(
             title: "Summary",
             content: analysis['summary']?.toString() ?? '',
-            color: Colors.red,
+            color: AppColors.danger,
             icon: Icons.receipt_long,
           ),
           const SizedBox(height: 12),
           _buildAnalysisLists(
             "Highest Categories",
             analysis['highestCategories'] as List? ?? [],
-            Colors.red,
+            AppColors.danger,
             Icons.trending_up,
           ),
           const SizedBox(height: 12),
           _buildAnalysisLists(
             "Inefficiencies",
             analysis['inefficiencies'] as List? ?? [],
-            Colors.orange,
+            AppColors.warning,
             Icons.error,
           ),
           const SizedBox(height: 12),
           _buildAnalysisLists(
             "Optimization Tips",
             analysis['optimizationTips'] as List? ?? [],
-            Colors.green,
+            AppColors.success,
             Icons.tips_and_updates,
           ),
         ],
@@ -524,39 +464,39 @@ class _AiInsightsPageState extends State<AiInsightsPage>
     final insights = _insights!['operationalInsights'] as List? ?? [];
 
     return _buildSection(
-      title: "⚙️ Operational Insights",
+      title: "Operational insights",
       child: Column(
         children: insights.map<Widget>((insight) {
           return Container(
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.indigo[50],
+              color: AppColors.sunken,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.indigo[200]!),
+              border: Border.all(color: AppColors.hairlineStrong),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   insight['metric'].toString(),
-                  style: GoogleFonts.montserrat(
+                  style: GoogleFonts.hankenGrotesk(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
-                    color: Colors.indigo[700],
+                    color: AppColors.ink,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   "Status: ${insight['status']}",
-                  style: GoogleFonts.montserrat(fontSize: 14),
+                  style: GoogleFonts.hankenGrotesk(fontSize: 14),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   "Recommendation: ${insight['recommendation']}",
-                  style: GoogleFonts.montserrat(
+                  style: GoogleFonts.hankenGrotesk(
                     fontSize: 14,
-                    color: Colors.grey[700],
+                    color: AppColors.ink2,
                   ),
                 ),
               ],
@@ -572,15 +512,15 @@ class _AiInsightsPageState extends State<AiInsightsPage>
         [];
 
     return _buildSection(
-      title: "🎯 Actionable Recommendations",
+      title: "Actionable recommendations",
       child: Column(
         children: recommendations.map<Widget>((rec) {
           final priority = rec['priority'] ?? 'Medium';
           Color priorityColor = priority == 'High'
-              ? Colors.red
+              ? AppColors.danger
               : priority == 'Medium'
-              ? Colors.orange
-              : Colors.green;
+              ? AppColors.warning
+              : AppColors.success;
 
           IconData categoryIcon;
           switch (rec['category']?.toLowerCase()) {
@@ -606,13 +546,7 @@ class _AiInsightsPageState extends State<AiInsightsPage>
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.2),
-                  blurRadius: 5,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+              border: Border.all(color: AppColors.hairline),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -624,7 +558,7 @@ class _AiInsightsPageState extends State<AiInsightsPage>
                     Expanded(
                       child: Text(
                         rec['action'].toString(),
-                        style: GoogleFonts.montserrat(
+                        style: GoogleFonts.hankenGrotesk(
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
                         ),
@@ -639,7 +573,7 @@ class _AiInsightsPageState extends State<AiInsightsPage>
                       ),
                       child: Text(
                         priority,
-                        style: GoogleFonts.montserrat(
+                        style: GoogleFonts.hankenGrotesk(
                           color: Colors.white,
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -651,18 +585,18 @@ class _AiInsightsPageState extends State<AiInsightsPage>
                 const SizedBox(height: 12),
                 Text(
                   "Expected Impact: ${rec['expectedImpact']}",
-                  style: GoogleFonts.montserrat(
+                  style: GoogleFonts.hankenGrotesk(
                     fontSize: 14,
-                    color: Colors.green[700],
+                    color: AppColors.success,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   "Timeframe: ${rec['timeframe']}",
-                  style: GoogleFonts.montserrat(
+                  style: GoogleFonts.hankenGrotesk(
                     fontSize: 14,
-                    color: Colors.grey[600],
+                    color: AppColors.ink3,
                   ),
                 ),
               ],
@@ -677,25 +611,25 @@ class _AiInsightsPageState extends State<AiInsightsPage>
     final insights = _insights!['predictiveInsights'] as List? ?? [];
 
     return _buildSection(
-      title: "🔮 Predictive Insights",
+      title: "Predictive insights",
       child: Column(
         children: insights.map<Widget>((insight) {
           return Container(
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.purple[50],
+              color: AppColors.sunken,
               borderRadius: BorderRadius.circular(12),
 
             ),
             child: Row(
               children: [
-                Icon(Icons.auto_awesome, color: Colors.purple[700]),
+                Icon(Icons.auto_awesome, color: AppColors.ink),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     insight.toString(),
-                    style: GoogleFonts.montserrat(fontSize: 14),
+                    style: GoogleFonts.hankenGrotesk(fontSize: 14),
                   ),
                 ),
               ],
@@ -711,7 +645,7 @@ class _AiInsightsPageState extends State<AiInsightsPage>
         dynamic>? ?? {};
 
     return _buildSection(
-      title: "📈 Industry Benchmark Comparison",
+      title: "Industry benchmark comparison",
       child: Column(
         children: [
           _buildBenchmarkCard(
@@ -728,20 +662,16 @@ class _AiInsightsPageState extends State<AiInsightsPage>
   }
 
   Widget _buildSection({required String title, required Widget child}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: GoogleFonts.montserrat(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.grey[800],
-          ),
-        ),
-        const SizedBox(height: 12),
-        child,
-      ],
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: AppText.title.copyWith(fontSize: 18)),
+          const SizedBox(height: 12),
+          child,
+        ],
+      ),
     );
   }
 
@@ -754,9 +684,9 @@ class _AiInsightsPageState extends State<AiInsightsPage>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: AppColors.hairline),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -767,7 +697,7 @@ class _AiInsightsPageState extends State<AiInsightsPage>
               const SizedBox(width: 8),
               Text(
                 title,
-                style: GoogleFonts.montserrat(
+                style: GoogleFonts.hankenGrotesk(
                   fontWeight: FontWeight.bold,
                   color: color,
                   fontSize: 16,
@@ -778,9 +708,9 @@ class _AiInsightsPageState extends State<AiInsightsPage>
           const SizedBox(height: 8),
           Text(
             content,
-            style: GoogleFonts.montserrat(
+            style: GoogleFonts.hankenGrotesk(
               fontSize: 14,
-              color: Colors.grey[700],
+              color: AppColors.ink2,
             ),
           ),
         ],
@@ -795,9 +725,9 @@ class _AiInsightsPageState extends State<AiInsightsPage>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: AppColors.hairline),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -808,7 +738,7 @@ class _AiInsightsPageState extends State<AiInsightsPage>
               const SizedBox(width: 8),
               Text(
                 title,
-                style: GoogleFonts.montserrat(
+                style: GoogleFonts.hankenGrotesk(
                   fontWeight: FontWeight.bold,
                   color: color,
                   fontSize: 15,
@@ -835,9 +765,9 @@ class _AiInsightsPageState extends State<AiInsightsPage>
                   Expanded(
                     child: Text(
                       item.toString(),
-                      style: GoogleFonts.montserrat(
+                      style: GoogleFonts.hankenGrotesk(
                         fontSize: 13,
-                        color: Colors.grey[700],
+                        color: AppColors.ink2,
                       ),
                     ),
                   ),
@@ -854,13 +784,13 @@ class _AiInsightsPageState extends State<AiInsightsPage>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.teal[50],
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.teal[200]!),
+        border: Border.all(color: AppColors.hairline),
       ),
       child: Row(
         children: [
-          Icon(Icons.bar_chart, color: Colors.teal[700]),
+          Icon(Icons.bar_chart, color: AppColors.roomOnly),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -868,18 +798,18 @@ class _AiInsightsPageState extends State<AiInsightsPage>
               children: [
                 Text(
                   metric,
-                  style: GoogleFonts.montserrat(
+                  style: GoogleFonts.hankenGrotesk(
                     fontWeight: FontWeight.bold,
                     fontSize: 15,
-                    color: Colors.teal[700],
+                    color: AppColors.roomOnly,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   comparison,
-                  style: GoogleFonts.montserrat(
+                  style: GoogleFonts.hankenGrotesk(
                     fontSize: 13,
-                    color: Colors.grey[700],
+                    color: AppColors.ink2,
                   ),
                 ),
               ],
@@ -894,14 +824,14 @@ class _AiInsightsPageState extends State<AiInsightsPage>
     final analysis = _insights!['mealServiceAnalysis'] as Map<String, dynamic>? ?? {};
 
     return _buildSection(
-      title: "🍽️ Meal Service Analysis",
+      title: "Meal service analysis",
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildAnalysisCard(
             title: "Summary",
             content: analysis['summary']?.toString() ?? '',
-            color: Colors.amber,
+            color: AppColors.warning,
             icon: Icons.restaurant,
           ),
           const SizedBox(height: 12),
@@ -914,7 +844,7 @@ class _AiInsightsPageState extends State<AiInsightsPage>
           _buildAnalysisLists(
             "Cost Optimization",
             analysis['costOptimization'] as List? ?? [],
-            Colors.green,
+            AppColors.success,
             Icons.savings,
           ),
           if (analysis['staffingInsights']?.toString().isNotEmpty == true) ...[
@@ -922,7 +852,7 @@ class _AiInsightsPageState extends State<AiInsightsPage>
             _buildAnalysisCard(
               title: "Staffing Insights",
               content: analysis['staffingInsights']?.toString() ?? '',
-              color: Colors.blue,
+              color: AppColors.info,
               icon: Icons.people,
             ),
           ],
@@ -938,27 +868,27 @@ class _AiInsightsPageState extends State<AiInsightsPage>
     switch (mealType.toLowerCase()) {
       case 'breakfast':
         icon = Icons.free_breakfast;
-        color = Colors.orange;
+        color = AppColors.warning;
         break;
       case 'lunch':
         icon = Icons.lunch_dining;
-        color = Colors.green;
+        color = AppColors.success;
         break;
       case 'dinner':
         icon = Icons.dinner_dining;
-        color = Colors.red;
+        color = AppColors.danger;
         break;
       default:
         icon = Icons.restaurant;
-        color = Colors.amber;
+        color = AppColors.warning;
     }
 
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: AppColors.hairline),
       ),
       child: Row(
         children: [
@@ -970,7 +900,7 @@ class _AiInsightsPageState extends State<AiInsightsPage>
               children: [
                 Text(
                   mealType,
-                  style: GoogleFonts.montserrat(
+                  style: GoogleFonts.hankenGrotesk(
                     fontWeight: FontWeight.bold,
                     color: color,
                     fontSize: 14,
@@ -978,9 +908,9 @@ class _AiInsightsPageState extends State<AiInsightsPage>
                 ),
                 Text(
                   analysis,
-                  style: GoogleFonts.montserrat(
+                  style: GoogleFonts.hankenGrotesk(
                     fontSize: 12,
-                    color: Colors.grey[700],
+                    color: AppColors.ink2,
                   ),
                 ),
               ],
@@ -995,14 +925,14 @@ class _AiInsightsPageState extends State<AiInsightsPage>
     final analysis = _insights!['roomSalesAnalysis'] as Map<String, dynamic>? ?? {};
 
     return _buildSection(
-      title: "🏨 Room Sales Analysis",
+      title: "Room sales analysis",
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildAnalysisCard(
             title: "Summary",
             content: analysis['summary']?.toString() ?? '',
-            color: Colors.purple,
+            color: AppColors.ink,
             icon: Icons.hotel,
           ),
           const SizedBox(height: 12),
@@ -1017,7 +947,7 @@ class _AiInsightsPageState extends State<AiInsightsPage>
           _buildAnalysisLists(
             "Recommendations",
             analysis['recommendations'] as List? ?? [],
-            Colors.blue,
+            AppColors.info,
             Icons.lightbulb,
           ),
         ],
@@ -1029,13 +959,13 @@ class _AiInsightsPageState extends State<AiInsightsPage>
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.purple.withOpacity(0.1),
+        color: AppColors.ink.withOpacity(0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.purple.withOpacity(0.3)),
+        border: Border.all(color: AppColors.ink.withOpacity(0.3)),
       ),
       child: Row(
         children: [
-          Icon(icon, color: Colors.purple, size: 18),
+          Icon(icon, color: AppColors.ink, size: 18),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -1043,17 +973,17 @@ class _AiInsightsPageState extends State<AiInsightsPage>
               children: [
                 Text(
                   roomType,
-                  style: GoogleFonts.montserrat(
+                  style: GoogleFonts.hankenGrotesk(
                     fontWeight: FontWeight.bold,
-                    color: Colors.purple,
+                    color: AppColors.ink,
                     fontSize: 14,
                   ),
                 ),
                 Text(
                   analysis,
-                  style: GoogleFonts.montserrat(
+                  style: GoogleFonts.hankenGrotesk(
                     fontSize: 12,
-                    color: Colors.grey[700],
+                    color: AppColors.ink2,
                   ),
                 ),
               ],
@@ -1070,43 +1000,43 @@ class _AiInsightsPageState extends State<AiInsightsPage>
     if (outliers.isEmpty) return const SizedBox.shrink();
 
     return _buildSection(
-      title: "💸 High-Impact Expenses",
+      title: "High-impact expenses",
       child: Column(
         children: outliers.map<Widget>((outlier) {
           return Container(
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.red[50],
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.red[200]!),
+              border: Border.all(color: AppColors.hairline),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Icon(Icons.warning, color: Colors.red[700]),
+                    Icon(Icons.warning, color: AppColors.danger),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         outlier['vendor'].toString(),
-                        style: GoogleFonts.montserrat(
+                        style: GoogleFonts.hankenGrotesk(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
-                          color: Colors.red[700],
+                          color: AppColors.danger,
                         ),
                       ),
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.red[700],
+                        color: AppColors.danger,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
                         "${outlier['percentageOfRevenue'] ?? outlier['percentage']}%",
-                        style: GoogleFonts.montserrat(
+                        style: GoogleFonts.hankenGrotesk(
                           color: Colors.white,
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -1118,26 +1048,26 @@ class _AiInsightsPageState extends State<AiInsightsPage>
                 const SizedBox(height: 8),
                 Text(
                   "Amount: LKR ${outlier['amount'].toString()}",
-                  style: GoogleFonts.montserrat(
+                  style: GoogleFonts.hankenGrotesk(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Colors.red[800],
+                    color: AppColors.danger,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   "Impact: ${outlier['impact']}",
-                  style: GoogleFonts.montserrat(
+                  style: GoogleFonts.hankenGrotesk(
                     fontSize: 14,
-                    color: Colors.grey[700],
+                    color: AppColors.ink2,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   "Recommendation: ${outlier['recommendation']}",
-                  style: GoogleFonts.montserrat(
+                  style: GoogleFonts.hankenGrotesk(
                     fontSize: 14,
-                    color: Colors.green[700],
+                    color: AppColors.success,
                     fontWeight: FontWeight.w500,
                   ),
                 ),

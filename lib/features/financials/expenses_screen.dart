@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:odon_booking/shared/widgets/odon_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:odon_booking/core/api/api_service.dart';
 import 'ViewEditSalariesExpensesScreen.dart';
@@ -30,53 +31,34 @@ class _ExpensesAndSalaryScreenState extends State<ExpensesAndSalaryScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF312E81), Color(0xFF4F46E5)],
-            ),
-          ),
-        ),
-        title: const Text(
-          'Expenses & Salaries',
-          style: TextStyle(
-            fontFamily: 'Outfit',
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text('Expenses & salaries'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.list_alt_rounded, color: Colors.white),
+          TextButton.icon(
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => ViewEditSalariesExpensesScreen()),
             ),
-            tooltip: 'View Records',
+            icon: const Icon(Icons.list_alt_rounded, size: 18),
+            label: const Text('Records'),
           ),
+          const SizedBox(width: 8),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white60,
-          indicatorColor: Colors.white,
-          indicatorWeight: 3,
-          labelStyle: const TextStyle(
-            fontFamily: 'Outfit',
-            fontWeight: FontWeight.w600,
-            fontSize: 15,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(56),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: AppLayout.maxForm),
+                child: SegmentedTabs(
+                  controller: _tabController,
+                  labels: const ['Salaries', 'Expenses'],
+                  icons: const [Icons.people_alt_outlined, Icons.receipt_long_outlined],
+                ),
+              ),
+            ),
           ),
-          tabs: const [
-            Tab(icon: Icon(Icons.people_alt_rounded), text: 'Salaries'),
-            Tab(icon: Icon(Icons.receipt_long_rounded), text: 'Expenses'),
-          ],
         ),
       ),
       body: TabBarView(
@@ -143,15 +125,12 @@ class _SalaryTabState extends State<SalaryTab> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Salary record added'),
-            backgroundColor: Colors.green.shade600,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         );
         _clearForm();
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.danger),
         );
       }
     }
@@ -184,8 +163,6 @@ class _SalaryTabState extends State<SalaryTab> {
                 content: Text(
                   'Added ${salaryData.length} salary + ${expenseData.length} expense entries',
                 ),
-                backgroundColor: Colors.green.shade600,
-                behavior: SnackBarBehavior.floating,
                 duration: const Duration(seconds: 4),
               ),
             );
@@ -195,15 +172,13 @@ class _SalaryTabState extends State<SalaryTab> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('No financial data found in the image'),
-            backgroundColor: Colors.orange,
-            behavior: SnackBarBehavior.floating,
           ),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: ${e.toString().replaceAll('Exception: ', '')}'),
-            backgroundColor: Colors.red),
+            backgroundColor: AppColors.danger),
       );
     }
   }
@@ -227,8 +202,6 @@ class _SalaryTabState extends State<SalaryTab> {
               content: Text(
                 'Added ${salaryData.length} salary + ${expenseData.length} expense entries',
               ),
-              backgroundColor: Colors.green.shade600,
-              behavior: SnackBarBehavior.floating,
               duration: const Duration(seconds: 4),
             ),
           );
@@ -237,7 +210,7 @@ class _SalaryTabState extends State<SalaryTab> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: ${e.toString().replaceAll('Exception: ', '')}'),
-            backgroundColor: Colors.red),
+            backgroundColor: AppColors.danger),
       );
     }
   }
@@ -256,7 +229,7 @@ class _SalaryTabState extends State<SalaryTab> {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: AppLayout.sliverPadding(context, maxWidth: AppLayout.maxForm, top: 16, bottom: 32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -269,17 +242,11 @@ class _SalaryTabState extends State<SalaryTab> {
           const SizedBox(height: 20),
 
           // Section label
-          _sectionLabel('Add Salary Record'),
+          _sectionLabel('Add a salary'),
           const SizedBox(height: 10),
 
           // Form card
           Card(
-            elevation: 0,
-            color: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-              side: BorderSide(color: Colors.grey.shade200),
-            ),
             child: Padding(
               padding: const EdgeInsets.all(20),
               child: Form(
@@ -344,27 +311,10 @@ class _SalaryTabState extends State<SalaryTab> {
                     ),
                     const SizedBox(height: 22),
 
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: _submitSalary,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.indigo,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                        ),
-                        child: const Text(
-                          'Add Salary Record',
-                          style: TextStyle(
-                            fontFamily: 'Outfit',
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
+                    FilledButton(
+                      onPressed: _submitSalary,
+                      style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                      child: Text('Add salary record'),
                     ),
                   ],
                 ),
@@ -487,7 +437,7 @@ class _ExpensesTabState extends State<ExpensesTab> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.grey.shade200),
+              border: Border.all(color: AppColors.hairline),
             ),
             child: ListView.builder(
               shrinkWrap: true,
@@ -506,12 +456,12 @@ class _ExpensesTabState extends State<ExpensesTab> {
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
                       border: index < suggestions.length - 1
-                          ? Border(bottom: BorderSide(color: Colors.grey.shade100))
+                          ? Border(bottom: BorderSide(color: AppColors.sunken))
                           : null,
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.history, size: 16, color: Colors.grey.shade500),
+                        Icon(Icons.history, size: 16, color: AppColors.ink3),
                         const SizedBox(width: 8),
                         Expanded(child: Text(s, style: const TextStyle(fontSize: 14))),
                       ],
@@ -545,16 +495,13 @@ class _ExpensesTabState extends State<ExpensesTab> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Expense record added'),
-            backgroundColor: Colors.green.shade600,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         );
         _loadExpenseNames();
         _clearForm();
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.danger),
         );
       }
     }
@@ -588,8 +535,6 @@ class _ExpensesTabState extends State<ExpensesTab> {
                 content: Text(
                   'Added ${salaryData.length} salary + ${expenseData.length} expense entries',
                 ),
-                backgroundColor: Colors.green.shade600,
-                behavior: SnackBarBehavior.floating,
                 duration: const Duration(seconds: 4),
               ),
             );
@@ -599,15 +544,13 @@ class _ExpensesTabState extends State<ExpensesTab> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('No financial data found in the image'),
-            backgroundColor: Colors.orange,
-            behavior: SnackBarBehavior.floating,
           ),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: ${e.toString().replaceAll('Exception: ', '')}'),
-            backgroundColor: Colors.red),
+            backgroundColor: AppColors.danger),
       );
     }
   }
@@ -632,8 +575,6 @@ class _ExpensesTabState extends State<ExpensesTab> {
               content: Text(
                 'Added ${salaryData.length} salary + ${expenseData.length} expense entries',
               ),
-              backgroundColor: Colors.green.shade600,
-              behavior: SnackBarBehavior.floating,
               duration: const Duration(seconds: 4),
             ),
           );
@@ -642,7 +583,7 @@ class _ExpensesTabState extends State<ExpensesTab> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: ${e.toString().replaceAll('Exception: ', '')}'),
-            backgroundColor: Colors.red),
+            backgroundColor: AppColors.danger),
       );
     }
   }
@@ -664,15 +605,6 @@ class _ExpensesTabState extends State<ExpensesTab> {
       initialDate: _selectedDate,
       firstDate: DateTime(2020),
       lastDate: DateTime.now().add(const Duration(days: 365)),
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
-          colorScheme: const ColorScheme.light(
-            primary: Colors.indigo,
-            onPrimary: Colors.white,
-          ),
-        ),
-        child: child!,
-      ),
     );
     if (picked != null) setState(() => _selectedDate = picked);
   }
@@ -680,7 +612,7 @@ class _ExpensesTabState extends State<ExpensesTab> {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: AppLayout.sliverPadding(context, maxWidth: AppLayout.maxForm, top: 16, bottom: 32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -692,16 +624,10 @@ class _ExpensesTabState extends State<ExpensesTab> {
           _PasteBanner(onPaste: _importFromPastedJson, label: 'Paste month JSON from Claude'),
           const SizedBox(height: 20),
 
-          _sectionLabel('Add Expense Record'),
+          _sectionLabel('Add an expense'),
           const SizedBox(height: 10),
 
           Card(
-            elevation: 0,
-            color: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-              side: BorderSide(color: Colors.grey.shade200),
-            ),
             child: Padding(
               padding: const EdgeInsets.all(20),
               child: Form(
@@ -715,27 +641,16 @@ class _ExpensesTabState extends State<ExpensesTab> {
                       decoration: InputDecoration(
                         labelText: 'Expense Name',
                         hintText: 'Type to see suggestions',
-                        prefixIcon: Icon(Icons.receipt_outlined, color: Colors.indigo.shade400, size: 20),
+                        prefixIcon: const Icon(Icons.receipt_outlined, size: 20),
                         suffixIcon: _nameController.text.isNotEmpty
                             ? IconButton(
-                                icon: Icon(Icons.clear, size: 18, color: Colors.grey.shade400),
+                                icon: Icon(Icons.clear, size: 18, color: AppColors.ink4),
                                 onPressed: () {
                                   _nameController.clear();
                                   _removeOverlay();
                                 },
                               )
                             : null,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide(color: Colors.grey.shade200),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: Colors.indigo, width: 2),
-                        ),
-                        filled: true,
-                        fillColor: Colors.grey.shade50,
                       ),
                       validator: (v) =>
                           (v == null || v.isEmpty) ? 'Enter expense name' : null,
@@ -774,20 +689,20 @@ class _ExpensesTabState extends State<ExpensesTab> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade50,
+                          color: AppColors.canvas,
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.grey.shade200),
+                          border: Border.all(color: AppColors.hairline),
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.calendar_today_outlined, color: Colors.indigo.shade400, size: 20),
+                            Icon(Icons.calendar_today_outlined, color: AppColors.ink3, size: 20),
                             const SizedBox(width: 12),
                             Text(
                               '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
                               style: const TextStyle(fontSize: 15),
                             ),
                             const Spacer(),
-                            Text('Tap to change', style: TextStyle(fontSize: 12, color: Colors.grey.shade400)),
+                            Text('Tap to change', style: TextStyle(fontSize: 12, color: AppColors.ink4)),
                           ],
                         ),
                       ),
@@ -803,27 +718,10 @@ class _ExpensesTabState extends State<ExpensesTab> {
                     ),
                     const SizedBox(height: 22),
 
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: _submitExpense,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.indigo,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                        ),
-                        child: const Text(
-                          'Add Expense Record',
-                          style: TextStyle(
-                            fontFamily: 'Outfit',
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
+                    FilledButton(
+                      onPressed: _submitExpense,
+                      style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                      child: Text('Add expense record'),
                     ),
                   ],
                 ),
@@ -846,52 +744,12 @@ class _ScanBanner extends StatelessWidget {
   const _ScanBanner({required this.onScan, required this.label});
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.indigo.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.indigo.shade100),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: Colors.indigo.shade100,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(Icons.document_scanner_outlined, color: Colors.indigo.shade700, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.indigo.shade800,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          TextButton(
-            onPressed: onScan,
-            style: TextButton.styleFrom(
-              backgroundColor: Colors.indigo,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            child: const Text('Scan', style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.w600)),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => _ImportRow(
+        icon: Icons.document_scanner_outlined,
+        label: label,
+        action: 'Scan',
+        onTap: onScan,
+      );
 }
 
 class _PasteBanner extends StatelessWidget {
@@ -900,47 +758,36 @@ class _PasteBanner extends StatelessWidget {
   const _PasteBanner({required this.onPaste, required this.label});
 
   @override
+  Widget build(BuildContext context) => _ImportRow(
+        icon: Icons.content_paste_rounded,
+        label: label,
+        action: 'Paste',
+        onTap: onPaste,
+      );
+}
+
+/// A shortcut for filling the form from somewhere else (photo, clipboard).
+class _ImportRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String action;
+  final VoidCallback onTap;
+  const _ImportRow({required this.icon, required this.label, required this.action, required this.onTap});
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.teal.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.teal.shade100),
-      ),
+    return SurfaceCard(
+      shadow: false,
+      padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
       child: Row(
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: Colors.teal.shade100,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(Icons.content_paste_rounded, color: Colors.teal.shade700, size: 20),
-          ),
+          IconWell(icon, size: 38),
           const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.teal.shade800,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          TextButton(
-            onPressed: onPaste,
-            style: TextButton.styleFrom(
-              backgroundColor: Colors.teal,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            child: const Text('Paste', style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.w600)),
+          Expanded(child: Text(label, style: AppText.bodyStrong.copyWith(fontSize: 14))),
+          OutlinedButton(
+            onPressed: onTap,
+            style: OutlinedButton.styleFrom(minimumSize: const Size(72, 38)),
+            child: Text(action),
           ),
         ],
       ),
@@ -978,15 +825,11 @@ class _DateSelector extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(Icons.calendar_month_outlined, size: 16, color: Colors.indigo.shade400),
+            const Icon(Icons.calendar_month_outlined, size: 16, color: AppColors.ink3),
             const SizedBox(width: 6),
             Text(
-              'Date  —  ${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Colors.indigo.shade600,
-              ),
+              '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+              style: AppText.bodyStrong.copyWith(fontSize: 14),
             ),
           ],
         ),
@@ -1001,14 +844,7 @@ class _DateSelector extends StatelessWidget {
                 isExpanded: true,
                 decoration: InputDecoration(
                   labelText: 'Month',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: Colors.grey.shade200),
-                  ),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  filled: true,
-                  fillColor: Colors.grey.shade50,
                 ),
                 items: months
                     .map((m) => DropdownMenuItem(value: m, child: Text(monthNames[int.parse(m) - 1])))
@@ -1025,14 +861,7 @@ class _DateSelector extends StatelessWidget {
                 isExpanded: true,
                 decoration: InputDecoration(
                   labelText: 'Year',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: Colors.grey.shade200),
-                  ),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  filled: true,
-                  fillColor: Colors.grey.shade50,
                 ),
                 items: years.map((y) => DropdownMenuItem(value: y, child: Text(y))).toList(),
                 onChanged: onYearChanged,
@@ -1047,14 +876,7 @@ class _DateSelector extends StatelessWidget {
                 isExpanded: true,
                 decoration: InputDecoration(
                   labelText: 'Day',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: Colors.grey.shade200),
-                  ),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                  filled: true,
-                  fillColor: Colors.grey.shade50,
                 ),
                 items: daysInMonth
                     .map((d) => DropdownMenuItem(value: d, child: Text(d.toString())))
@@ -1070,32 +892,13 @@ class _DateSelector extends StatelessWidget {
 }
 
 Widget _sectionLabel(String text) => Padding(
-      padding: const EdgeInsets.only(left: 2),
-      child: Text(
-        text.toUpperCase(),
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: Colors.grey.shade500,
-          letterSpacing: 1.1,
-        ),
-      ),
+      padding: const EdgeInsets.only(left: 4),
+      child: Text(text.toUpperCase(), style: AppText.eyebrow),
     );
 
 InputDecoration _indigoDecoration(String label, IconData icon) => InputDecoration(
       labelText: label,
-      prefixIcon: Icon(icon, color: Colors.indigo.shade400, size: 20),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: Colors.grey.shade200),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: Colors.indigo, width: 2),
-      ),
-      filled: true,
-      fillColor: Colors.grey.shade50,
+      prefixIcon: Icon(icon, size: 20),
     );
 
 Widget _indigoField({

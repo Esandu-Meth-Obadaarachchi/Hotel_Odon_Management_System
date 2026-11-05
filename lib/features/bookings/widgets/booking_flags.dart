@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:odon_booking/shared/widgets/odon_ui.dart';
 
 /// Yes/no extras on a booking that the staff need to prepare for, shown as
 /// badges on the booking cards. The driver room keeps its own badge.
@@ -44,9 +45,9 @@ class OptionalTimeField extends StatelessWidget {
     final label = formatStayTime(value);
     return Row(
       children: [
-        Icon(Icons.access_time_rounded, size: 16, color: Colors.grey.shade500),
+        const Icon(Icons.access_time_rounded, size: 16, color: AppColors.ink3),
         const SizedBox(width: 6),
-        Text(hint, style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+        Text(hint, style: AppText.callout),
         const Spacer(),
         OutlinedButton(
           onPressed: () async {
@@ -57,8 +58,8 @@ class OptionalTimeField extends StatelessWidget {
             if (picked != null) onChanged(stayTimeToString(picked));
           },
           style: OutlinedButton.styleFrom(
-            foregroundColor: Colors.indigo,
             visualDensity: VisualDensity.compact,
+            minimumSize: const Size(64, 38),
           ),
           child: Text(label ?? 'Set time'),
         ),
@@ -66,7 +67,7 @@ class OptionalTimeField extends StatelessWidget {
           IconButton(
             tooltip: 'Clear time',
             visualDensity: VisualDensity.compact,
-            icon: Icon(Icons.close_rounded, size: 18, color: Colors.grey.shade500),
+            icon: const Icon(Icons.close_rounded, size: 18, color: AppColors.ink3),
             onPressed: () => onChanged(null),
           ),
       ],
@@ -84,18 +85,18 @@ class BookingFlagBadges extends StatelessWidget {
   Widget build(BuildContext context) {
     final badges = <Widget>[
       if (booking['needKiriPidu'] == true)
-        _badge(Icons.rice_bowl_rounded, 'Kiri Pidu Required', Colors.teal),
+        _badge(Icons.rice_bowl_rounded, 'Kiri pidu', AppColors.roomOnly),
       if (booking['earlyCheckIn'] == true)
         _badge(
           Icons.schedule_rounded,
-          'Early Check-in · ${formatStayTime(booking['earlyCheckInTime']) ?? 'time not set'}',
-          Colors.green,
+          'Early check-in · ${formatStayTime(booking['earlyCheckInTime']) ?? 'time not set'}',
+          AppColors.success,
         ),
       if (booking['lateCheckOut'] == true)
         _badge(
           Icons.more_time_rounded,
-          'Late Check-out · ${formatStayTime(booking['lateCheckOutTime']) ?? 'time not set'}',
-          Colors.deepOrange,
+          'Late check-out · ${formatStayTime(booking['lateCheckOutTime']) ?? 'time not set'}',
+          AppColors.warning,
         ),
     ];
     if (badges.isEmpty) return const SizedBox.shrink();
@@ -105,27 +106,8 @@ class BookingFlagBadges extends StatelessWidget {
     );
   }
 
-  Widget _badge(IconData icon, String label, MaterialColor color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.shade50,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.shade300),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 15, color: color.shade800),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color.shade900),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _badge(IconData icon, String label, Color color) =>
+      StatusPill(label, color: color, icon: icon);
 }
 
 /// Option card with an icon, title, subtitle and switch, matching the
@@ -136,7 +118,7 @@ class OptionToggleCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final bool value;
-  final MaterialColor color;
+  final Color color;
   final ValueChanged<bool> onChanged;
   final Widget? child;
 
@@ -153,59 +135,51 @@ class OptionToggleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      color: Colors.white,
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: Colors.grey.shade200),
+    final c = color;
+    final accent = c is MaterialColor ? c.shade700 : c;
+    return AnimatedContainer(
+      duration: AppMotion.base,
+      curve: AppMotion.ease,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: AppRadius.card,
+        border: Border.all(color: value ? AppColors.ink : AppColors.hairline),
       ),
       child: Column(
         children: [
           InkWell(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: AppRadius.card,
             onTap: () => onChanged(!value),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               child: Row(
                 children: [
-                  Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: value ? color.shade50 : Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(icon, color: value ? color.shade700 : Colors.grey.shade400, size: 20),
-                  ),
+                  IconWell(icon, size: 38, color: value ? accent : null),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                        Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                        Text(title, style: AppText.bodyStrong.copyWith(fontSize: 14)),
+                        Text(subtitle, style: AppText.footnote),
                       ],
                     ),
                   ),
-                  Transform.scale(
-                    scale: 0.9,
-                    child: Switch(
-                      value: value,
-                      activeColor: color.shade700,
-                      onChanged: onChanged,
-                    ),
-                  ),
+                  Switch(value: value, onChanged: onChanged),
                 ],
               ),
             ),
           ),
-          if (value && child != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-              child: child,
-            ),
+          AnimatedSize(
+            duration: AppMotion.base,
+            curve: AppMotion.ease,
+            child: value && child != null
+                ? Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                    child: child,
+                  )
+                : const SizedBox(width: double.infinity),
+          ),
         ],
       ),
     );

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:odon_booking/shared/widgets/odon_ui.dart';
 
 /// Room grid shared by Add Booking and Edit Booking, so both screens pick
 /// rooms the same way: tap a card to select it, tap the `+` badge on a
@@ -114,47 +115,45 @@ class RoomPicker extends StatelessWidget {
     final roomType = isSelected ? effectiveRoomType(room, extraBed: hasExtra) : baseType;
     final pax = paxForType(roomType);
 
-    Color bgColor;
-    Color textColor = const Color(0xFF1E293B);
+    // Selected rooms take the ink fill used for every selection in the app;
+    // an extra bed adds amber so it can't be missed at the desk.
+    Color bgColor = AppColors.surface;
+    Color textColor = AppColors.ink;
+    Color borderColor = AppColors.hairlineStrong;
 
     if (isBlocked && !isSelected) {
-      bgColor = Colors.grey.shade300;
-      textColor = Colors.grey.shade600;
+      bgColor = AppColors.sunken;
+      textColor = AppColors.ink4;
+      borderColor = AppColors.sunken;
     } else if (isBooked) {
-      bgColor = Colors.red.shade400;
-      textColor = Colors.white;
+      bgColor = AppColors.tint(AppColors.danger, 0.07);
+      textColor = AppColors.danger;
+      borderColor = AppColors.tint(AppColors.danger, 0.25);
     } else if (isSelected && hasExtra) {
-      bgColor = Colors.orange.shade400;
+      bgColor = AppColors.warning;
       textColor = Colors.white;
+      borderColor = AppColors.warning;
     } else if (isSelected) {
-      bgColor = Colors.green.shade500;
+      bgColor = AppColors.ink;
       textColor = Colors.white;
-    } else {
-      bgColor = Colors.white;
+      borderColor = AppColors.ink;
     }
 
     final canTap = isSelected || (!isBlocked && !isBooked);
 
-    return GestureDetector(
+    return Pressable(
       onTap: canTap ? () => onToggleRoom(roomNum) : null,
+      pressedScale: 0.94,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
+        duration: AppMotion.fast,
+        curve: AppMotion.ease,
         decoration: BoxDecoration(
           color: bgColor,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected
-                ? (hasExtra ? Colors.orange.shade700 : Colors.green.shade700)
-                : Colors.grey.shade300,
-            width: isSelected ? 2 : 1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.07),
-              blurRadius: 5,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: borderColor),
+          boxShadow: isSelected
+              ? [BoxShadow(color: bgColor.withValues(alpha: 0.25), blurRadius: 10, offset: const Offset(0, 4))]
+              : null,
         ),
         child: Stack(
           children: [
@@ -164,15 +163,8 @@ class RoomPicker extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
-                      roomNum.padLeft(3, '0'),
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                        color: textColor,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
+                    Text(roomNum.padLeft(3, '0'), style: AppText.number(17, color: textColor)),
+                    const SizedBox(height: 3),
                     Text(
                       isSelected
                           ? roomType
@@ -181,48 +173,43 @@ class RoomPicker extends StatelessWidget {
                               : isBooked
                                   ? 'Booked'
                                   : baseType,
-                      style: TextStyle(
-                        fontSize: 9,
-                        color: textColor.withValues(alpha: 0.9),
-                        fontWeight: FontWeight.w500,
+                      style: AppText.footnote.copyWith(
+                        fontSize: 10,
+                        height: 1.2,
+                        color: textColor.withValues(alpha: 0.85),
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    if (isSelected) ...[
-                      const SizedBox(height: 1),
+                    if (isSelected)
                       Text(
-                        '${pax}pax',
-                        style: TextStyle(
-                          fontSize: 9,
-                          color: textColor.withValues(alpha: 0.8),
-                        ),
+                        '$pax pax',
+                        style: AppText.footnote.copyWith(
+                            fontSize: 10, height: 1.2, color: textColor.withValues(alpha: 0.7)),
                       ),
-                    ],
                   ],
                 ),
               ),
             ),
             if (isSelected)
               Positioned(
-                top: 3,
-                right: 3,
-                child: GestureDetector(
-                  onTap: () => onToggleExtraBed(roomNum),
-                  child: Container(
-                    width: 20,
-                    height: 20,
-                    decoration: BoxDecoration(
-                      color: hasExtra ? Colors.white : Colors.white.withValues(alpha: 0.6),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: hasExtra ? Colors.orange.shade700 : Colors.green.shade700,
-                        width: 1.5,
+                top: 4,
+                right: 4,
+                child: Tooltip(
+                  message: hasExtra ? 'Remove extra bed' : 'Add extra bed',
+                  child: GestureDetector(
+                    onTap: () => onToggleExtraBed(roomNum),
+                    child: Container(
+                      width: 22,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        color: hasExtra ? Colors.white : Colors.white.withValues(alpha: 0.18),
+                        shape: BoxShape.circle,
                       ),
-                    ),
-                    child: Icon(
-                      Icons.add,
-                      size: 13,
-                      color: hasExtra ? Colors.orange.shade700 : Colors.green.shade700,
+                      child: Icon(
+                        hasExtra ? Icons.remove_rounded : Icons.add_rounded,
+                        size: 14,
+                        color: hasExtra ? AppColors.warning : Colors.white,
+                      ),
                     ),
                   ),
                 ),
@@ -237,59 +224,19 @@ class RoomPicker extends StatelessWidget {
     final rooms = roomConfig.where((r) => r['floor'] == floor).toList();
     if (rooms.isEmpty) return const SizedBox.shrink();
 
-    final isGround = floor == 'Ground';
-
-    return Card(
-      elevation: 0,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: Colors.grey.shade200),
-      ),
+    return SurfaceCard(
+      padding: EdgeInsets.zero,
+      shadow: false,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Floor header
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: isGround ? Colors.indigo.shade50 : Colors.purple.shade50,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
-              border: Border(
-                bottom: BorderSide(
-                  color: isGround ? Colors.indigo.shade100 : Colors.purple.shade100,
-                ),
-              ),
-            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 2),
             child: Row(
               children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: isGround ? Colors.indigo : Colors.purple,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '$floor Floor',
-                  style: TextStyle(
-                    fontFamily: 'Outfit',
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                    color: isGround ? Colors.indigo.shade700 : Colors.purple.shade700,
-                    letterSpacing: 0.3,
-                  ),
-                ),
+                Text('$floor floor'.toUpperCase(), style: AppText.eyebrow),
                 const Spacer(),
-                Text(
-                  '${rooms.length} rooms',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isGround ? Colors.indigo.shade400 : Colors.purple.shade400,
-                  ),
-                ),
+                Text('${rooms.length} rooms', style: AppText.footnote.copyWith(fontSize: 12)),
               ],
             ),
           ),
@@ -319,11 +266,11 @@ class RoomPicker extends StatelessWidget {
       spacing: 10,
       runSpacing: 6,
       children: [
-        _legendChip(Colors.white, Colors.grey.shade400, 'Available'),
-        _legendChip(Colors.green.shade500, Colors.green.shade500, 'Selected'),
-        _legendChip(Colors.orange.shade400, Colors.orange.shade400, '+Extra bed'),
-        _legendChip(Colors.red.shade400, Colors.red.shade400, 'Booked'),
-        _legendChip(Colors.grey.shade300, Colors.grey.shade300, 'Blocked'),
+        _legendChip(AppColors.surface, AppColors.hairlineStrong, 'Available'),
+        _legendChip(AppColors.ink, AppColors.ink, 'Selected'),
+        _legendChip(AppColors.warning, AppColors.warning, 'Extra bed'),
+        _legendChip(AppColors.tint(AppColors.danger, 0.1), AppColors.tint(AppColors.danger, 0.4), 'Booked'),
+        _legendChip(AppColors.sunken, AppColors.sunken, 'Blocked'),
       ],
     );
   }
@@ -341,8 +288,8 @@ class RoomPicker extends StatelessWidget {
             border: Border.all(color: border),
           ),
         ),
-        const SizedBox(width: 4),
-        Text(label, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+        const SizedBox(width: 6),
+        Text(label, style: AppText.footnote.copyWith(fontSize: 12, color: AppColors.ink2)),
       ],
     );
   }

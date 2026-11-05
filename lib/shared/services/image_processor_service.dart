@@ -2,6 +2,7 @@
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:odon_booking/shared/widgets/odon_ui.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 
@@ -85,12 +86,12 @@ class ImageProcessorService {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: Icon(Icons.camera_alt, color: Color(0xFFEF4444)),
+              leading: Icon(Icons.camera_alt, color: AppColors.ink2),
               title: Text('Camera'),
               onTap: () => Navigator.pop(context, ImageSource.camera),
             ),
             ListTile(
-              leading: Icon(Icons.photo_library, color: Color(0xFFEF4444)),
+              leading: Icon(Icons.photo_library, color: AppColors.ink2),
               title: Text('Gallery'),
               onTap: () => Navigator.pop(context, ImageSource.gallery),
             ),

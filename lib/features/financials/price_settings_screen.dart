@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:odon_booking/shared/widgets/odon_ui.dart';
 import 'package:odon_booking/core/api/api_service.dart';
 
 class PriceSettingsScreen extends StatefulWidget {
@@ -27,11 +28,11 @@ class _PriceSettingsScreenState extends State<PriceSettingsScreen> {
 
   // Package accent colors — distinct, not all indigo
   static const Map<String, Color> _packageColors = {
-    'Full Board':        Color(0xFF16A34A),
-    'Half Board':        Color(0xFF2563EB),
-    'Bed and Breakfast': Color(0xFF7C3AED),
-    'Room Only':         Color(0xFF0891B2),
-    'Room + Dinner':     Color(0xFFEA580C),
+    'Full Board':        AppColors.fullBoard,
+    'Half Board':        AppColors.halfBoard,
+    'Bed and Breakfast': AppColors.bnb,
+    'Room Only':         AppColors.roomOnly,
+    'Room + Dinner':     AppColors.dinnerOnly,
   };
 
   static const Map<String, IconData> _packageIcons = {
@@ -94,7 +95,6 @@ class _PriceSettingsScreenState extends State<PriceSettingsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to load prices: $e'),
-          backgroundColor: Colors.red,
         ),
       );
     } finally {
@@ -117,14 +117,11 @@ class _PriceSettingsScreenState extends State<PriceSettingsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Prices saved'),
-          backgroundColor: Colors.green.shade600,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to save: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Failed to save: $e'), backgroundColor: AppColors.danger),
       );
     } finally {
       setState(() => _saving = false);
@@ -134,28 +131,8 @@ class _PriceSettingsScreenState extends State<PriceSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF312E81), Color(0xFF4F46E5)],
-            ),
-          ),
-        ),
-        title: const Text(
-          'Room Prices',
-          style: TextStyle(
-            fontFamily: 'Outfit',
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        foregroundColor: Colors.white,
+        title: const Text('Room prices'),
         actions: [
           _saving
               ? const Padding(
@@ -163,49 +140,24 @@ class _PriceSettingsScreenState extends State<PriceSettingsScreen> {
                   child: SizedBox(
                     width: 20,
                     height: 20,
-                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    child: CircularProgressIndicator(strokeWidth: 2),
                   ),
                 )
               : TextButton.icon(
                   onPressed: _savePrices,
-                  icon: const Icon(Icons.save_rounded, color: Colors.white, size: 18),
-                  label: const Text(
-                    'Save',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontFamily: 'Outfit',
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  icon: const Icon(Icons.save_rounded, size: 18),
+                  label: const Text('Save'),
                 ),
+          const SizedBox(width: 8),
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: Colors.indigo))
+          ? const LoadingView()
           : ListView(
-              padding: const EdgeInsets.all(16),
+              padding: AppLayout.sliverPadding(context, maxWidth: AppLayout.maxForm, top: 16, bottom: 32),
               children: [
                 // Header note
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.indigo.shade50,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.indigo.shade100),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline_rounded, color: Colors.indigo.shade600, size: 18),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Prices are per night in LKR. Changes apply to new bookings.',
-                          style: TextStyle(fontSize: 13, color: Colors.indigo.shade700),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                const InlineBanner('Prices are per night in LKR. Changes apply to new invoices.'),
                 const SizedBox(height: 16),
 
                 // Driver room
@@ -229,37 +181,23 @@ class _PriceSettingsScreenState extends State<PriceSettingsScreen> {
 
   Widget _buildDriverCard() {
     return Card(
-      elevation: 0,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade200),
-      ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: Colors.amber.shade50,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(Icons.directions_car_rounded, color: Colors.amber.shade700, size: 20),
-            ),
+            const IconWell(Icons.directions_car_rounded, size: 38),
             const SizedBox(width: 12),
             const Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Driver Room',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                    'Driver room',
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                   ),
                   Text(
                     'Per night',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                    style: TextStyle(fontSize: 12, color: AppColors.ink3),
                   ),
                 ],
               ),
@@ -270,21 +208,10 @@ class _PriceSettingsScreenState extends State<PriceSettingsScreen> {
                 controller: _driverRoomController,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 textAlign: TextAlign.right,
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                style: AppText.number(14),
                 decoration: InputDecoration(
                   prefixText: 'LKR ',
-                  prefixStyle: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: Colors.grey.shade200),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Colors.indigo, width: 2),
-                  ),
-                  filled: true,
-                  fillColor: Colors.grey.shade50,
+                  prefixStyle: TextStyle(fontSize: 12, color: AppColors.ink3),
                   isDense: true,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                 ),
@@ -307,12 +234,7 @@ class _PriceSettingsScreenState extends State<PriceSettingsScreen> {
               child: Text(
                 room,
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.grey.shade500,
-                  letterSpacing: 0.3,
-                ),
+                style: AppText.eyebrow.copyWith(fontSize: 10, letterSpacing: 0.4),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -323,17 +245,11 @@ class _PriceSettingsScreenState extends State<PriceSettingsScreen> {
   }
 
   Widget _buildPackageRow(String package) {
-    final color = _packageColors[package] ?? Colors.indigo;
+    final color = _packageColors[package] ?? AppColors.ink;
     final icon  = _packageIcons[package] ?? Icons.hotel_rounded;
     final abbr  = _packageAbbr[package] ?? package;
 
     return Card(
-      elevation: 0,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade200),
-      ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         child: Row(
@@ -357,11 +273,7 @@ class _PriceSettingsScreenState extends State<PriceSettingsScreen> {
                   Flexible(
                     child: Text(
                       abbr,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: color,
-                      ),
+                      style: AppText.bodyStrong.copyWith(fontSize: 13),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -377,19 +289,8 @@ class _PriceSettingsScreenState extends State<PriceSettingsScreen> {
                     controller: _controllers[package]![room],
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                    style: AppText.number(13, weight: FontWeight.w500),
                     decoration: InputDecoration(
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(6),
-                        borderSide: BorderSide(color: Colors.grey.shade200),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(6),
-                        borderSide: BorderSide(color: color, width: 2),
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey.shade50,
                       isDense: true,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                     ),

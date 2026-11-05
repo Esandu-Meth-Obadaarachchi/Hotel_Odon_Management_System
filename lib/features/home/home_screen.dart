@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:odon_booking/core/api/api_service.dart';
 import 'package:odon_booking/features/bookings/room_selection_screen.dart';
 import 'package:odon_booking/features/rooms/room_config_screen.dart';
@@ -14,16 +15,9 @@ import 'package:odon_booking/features/financials/expenses_screen.dart';
 import 'package:odon_booking/features/guests/guests_list_screen.dart';
 import 'package:odon_booking/features/settings/user_access_screen.dart';
 import 'package:odon_booking/features/auth/auth_gate.dart';
+import 'package:odon_booking/shared/widgets/odon_ui.dart';
 
 // ── Package meta ──────────────────────────────────────────────────────────────
-
-const _pkgColor = {
-  'Full Board':  Color(0xFF16A34A),
-  'Half Board':  Color(0xFF2563EB),
-  'BnB':         Color(0xFF7C3AED),
-  'Room Only':   Color(0xFF0891B2),
-  'Dinner Only': Color(0xFFEA580C),
-};
 
 const _pkgAbbrev = {
   'Full Board':  'FB',
@@ -291,9 +285,6 @@ class _HomeScreenState extends State<HomeScreen>
 
   // ── Layout ────────────────────────────────────────────────────────────────
 
-  /// Widest the dashboard content is allowed to get on large screens.
-  static const double _maxContentWidth = 1240;
-
   /// Two-column dashboard once there is room for it (desktop / large tablet).
   bool _isWide(double w) => w >= 900;
 
@@ -301,136 +292,151 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    final wide = _isWide(MediaQuery.of(context).size.width);
+    final wide = _isWide(MediaQuery.sizeOf(context).width);
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F5F9),
+      extendBody: true,
       // Phones reach the actions from the bottom bar instead of a tile grid.
       bottomNavigationBar: wide ? null : _bottomBar(),
-      body: RefreshIndicator(
-        onRefresh: _fetchData,
+      body: AnimatedSwitcher(
+        duration: AppMotion.base,
+        switchInCurve: AppMotion.ease,
         child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : CustomScrollView(
-                slivers: [
-                  _appBar(),
-                  SliverToBoxAdapter(
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: _maxContentWidth),
-                        child: wide ? _wideBody() : _narrowBody(),
-                      ),
+            ? const LoadingView(key: ValueKey('loading'), label: 'Loading the house…')
+            : RefreshIndicator(
+                key: const ValueKey('content'),
+                onRefresh: _fetchData,
+                child: CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: [
+                    _appBar(),
+                    SliverToBoxAdapter(
+                      child: PageBody(child: wide ? _wideBody() : _narrowBody()),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
       ),
     );
   }
 
   Widget _narrowBody() => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _dayToggle(),
-          if (_error != null) _errorBanner(),
-          _statsRow(),
+          _intro(),
+          const SizedBox(height: AppSpace.lg),
+          _dayToggleBox(),
+          if (_error != null) ...[const SizedBox(height: AppSpace.md), _errorBanner()],
+          const SizedBox(height: AppSpace.lg),
+          _statsCard(),
+          const SizedBox(height: AppSpace.lg),
           _roomMap(wrapTiles: false),
+          const SizedBox(height: AppSpace.lg),
           _mealSection(),
           _timingSection(),
-          const SizedBox(height: 24),
+          // Clears the floating bottom bar.
+          SizedBox(height: 96 + MediaQuery.paddingOf(context).bottom),
         ],
       );
 
-  /// Desktop: toggle + stats span the full width, then room map (wide column)
-  /// sits beside meals + quick actions so nothing is stretched edge-to-edge.
+  /// Desktop: greeting + day switch share a line, then the room board (wide
+  /// column) sits beside meals, timings and navigation.
   Widget _wideBody() => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (_error != null) _errorBanner(),
-          // Toggle and stats share one line — three full-width stat cards on a
-          // desktop monitor would otherwise be absurdly wide and mostly empty.
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-            child: IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  SizedBox(width: 300, child: _dayToggleBox()),
-                  const SizedBox(width: 16),
-                  ..._statCards(),
-                ],
-              ),
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(child: _intro()),
+              const SizedBox(width: AppSpace.xl),
+              SizedBox(width: 280, child: _dayToggleBox()),
+            ],
           ),
+          if (_error != null) ...[const SizedBox(height: AppSpace.lg), _errorBanner()],
+          const SizedBox(height: AppSpace.xl),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(flex: 3, child: _roomMap(wrapTiles: true)),
+              Expanded(
+                flex: 3,
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  _statsCard(),
+                  const SizedBox(height: AppSpace.lg),
+                  _roomMap(wrapTiles: true),
+                ]),
+              ),
+              const SizedBox(width: AppSpace.lg),
               Expanded(
                 flex: 2,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _mealSection(),
-                    _timingSection(),
-                    _quickActions(),
-                  ],
-                ),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  _quickActions(),
+                  const SizedBox(height: AppSpace.lg),
+                  _mealSection(),
+                  _timingSection(),
+                ]),
               ),
             ],
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: AppSpace.xxl),
         ],
       );
 
   // ── App bar ───────────────────────────────────────────────────────────────
 
   Widget _appBar() {
-    final now = DateTime.now();
-    final months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    final dateStr = '${now.day} ${months[now.month - 1]} ${now.year}';
-
     return SliverAppBar(
-      expandedHeight: 90,
-      floating: false,
       pinned: true,
-      backgroundColor: const Color(0xFF4F46E5),
+      toolbarHeight: 64,
       automaticallyImplyLeading: false,
-      flexibleSpace: FlexibleSpaceBar(
-        background: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF4F46E5), Color(0xFF7C3AED)],
-            ),
-          ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              child: Row(
+      backgroundColor: Colors.transparent,
+      shape: const Border(),
+      titleSpacing: 0,
+      flexibleSpace: const Frosted(
+        border: Border(bottom: BorderSide(color: AppColors.hairline, width: 0.5)),
+        child: SizedBox.expand(),
+      ),
+      title: PageBody(
+        alignment: Alignment.center,
+        child: Row(
+          children: [
+            const BrandSeal(size: 38),
+            const SizedBox(width: AppSpace.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.hotel, color: Colors.white, size: 26),
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text('ODON Hotel',
-                          style: TextStyle(color: Colors.white, fontSize: 20,
-                              fontWeight: FontWeight.bold, letterSpacing: 0.4)),
-                      Text('$dateStr  •  ${_freshnessLabel()}',
-                          style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 12)),
-                    ],
-                  ),
-                  const Spacer(),
-                  _refreshBtn(),
-                  const SizedBox(width: 8),
-                  _iconBtn(Icons.logout, () => Navigator.pushAndRemoveUntil(
-                    context, MaterialPageRoute(builder: (_) => LoginScreen()), (_) => false)),
+                  Text('The Odon', style: AppText.headline.copyWith(fontSize: 17)),
+                  const SizedBox(height: 1),
+                  Row(children: [
+                    AnimatedContainer(
+                      duration: AppMotion.base,
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _error != null
+                            ? AppColors.danger
+                            : (_refreshing ? AppColors.warning : AppColors.success),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(_freshnessLabel(),
+                          overflow: TextOverflow.ellipsis,
+                          style: AppText.footnote.copyWith(fontSize: 12)),
+                    ),
+                  ]),
                 ],
               ),
             ),
-          ),
+            _refreshBtn(),
+            IconButton(
+              tooltip: 'Sign out',
+              icon: const Icon(Icons.logout_rounded, size: 21),
+              onPressed: () => Navigator.pushAndRemoveUntil(
+                  context, MaterialPageRoute(builder: (_) => LoginScreen()), (_) => false),
+            ),
+          ],
         ),
       ),
     );
@@ -439,6 +445,7 @@ class _HomeScreenState extends State<HomeScreen>
   // Tells the user how stale the numbers are, so a quiet refresh is visible.
   String _freshnessLabel() {
     if (_refreshing) return 'Updating…';
+    if (_error != null) return 'Offline · showing last data';
     if (_lastUpdated == null) return 'Not updated yet';
     final mins = DateTime.now().difference(_lastUpdated!).inMinutes;
     if (mins < 1) return 'Updated just now';
@@ -448,211 +455,125 @@ class _HomeScreenState extends State<HomeScreen>
 
   Widget _refreshBtn() {
     if (_refreshing) {
-      return Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.18),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: const SizedBox(
-          width: 19, height: 19,
-          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+      return const SizedBox(
+        width: 44,
+        height: 44,
+        child: Center(
+          child: SizedBox(
+              width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
         ),
       );
     }
-    return _iconBtn(Icons.refresh, _fetchData);
+    return IconButton(
+      tooltip: 'Refresh',
+      icon: const Icon(Icons.refresh_rounded, size: 22),
+      onPressed: _fetchData,
+    );
   }
 
-  Widget _iconBtn(IconData icon, VoidCallback onTap) => GestureDetector(
-    onTap: onTap,
-    child: Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(10),
+  // ── Greeting ──────────────────────────────────────────────────────────────
+
+  Widget _intro() {
+    final now = DateTime.now();
+    final hour = now.hour;
+    final part = hour < 12 ? 'Good morning' : (hour < 17 ? 'Good afternoon' : 'Good evening');
+    final first = CurrentUser.current?.name.trim().split(' ').first ?? '';
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpace.xl),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(DateFormat('EEEE d MMMM').format(now).toUpperCase(), style: AppText.eyebrow),
+          const SizedBox(height: 6),
+          Text(first.isEmpty ? part : '$part, $first', style: AppText.largeTitle),
+        ],
       ),
-      child: Icon(icon, color: Colors.white, size: 19),
-    ),
-  );
+    );
+  }
 
   // ── Day toggle ───────────────────────────────────────────────────────────
 
-  Widget _dayToggle() => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-        child: _dayToggleBox(),
+  Widget _dayToggleBox() => SegmentedTabs(
+        controller: _tabController,
+        labels: const ['Today', 'Tomorrow'],
       );
 
-  Widget _dayToggleBox() {
-    return Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 8, offset: const Offset(0, 2))],
-        ),
-        child: TabBar(
-          controller: _tabController,
-          indicator: BoxDecoration(
-            color: const Color(0xFF4F46E5),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          indicatorSize: TabBarIndicatorSize.tab,
-          labelColor: Colors.white,
-          unselectedLabelColor: const Color(0xFF64748B),
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
-          padding: const EdgeInsets.all(4),
-          dividerColor: Colors.transparent,
-          tabs: const [
-            Tab(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Icon(Icons.today, size: 15), SizedBox(width: 6), Text('Today'),
-            ])),
-            Tab(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Icon(Icons.event, size: 15), SizedBox(width: 6), Text('Tomorrow'),
-            ])),
-          ],
-        ),
-      );
-  }
+  String get _dayWord => _dayOffset == 0 ? 'today' : 'tomorrow';
 
   // ── Error banner ─────────────────────────────────────────────────────────
 
-  Widget _errorBanner() => Container(
-    margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-    decoration: BoxDecoration(
-      color: Colors.red.shade50,
-      borderRadius: BorderRadius.circular(10),
-      border: Border.all(color: Colors.red.shade200),
-    ),
-    child: Row(children: [
-      Icon(Icons.warning_rounded, color: Colors.red.shade400, size: 18),
-      const SizedBox(width: 8),
-      const Expanded(child: Text('Could not load data. Pull down to retry.',
-          style: TextStyle(fontSize: 13, color: Colors.red))),
-    ]),
-  );
-
-  // ── Stats row ────────────────────────────────────────────────────────────
-
-  Widget _statsRow() => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-        child: Row(children: _statCards()),
+  Widget _errorBanner() => InlineBanner(
+        'Couldn\'t reach the server. Showing the last data we had.',
+        tone: BannerTone.danger,
+        actionLabel: 'Retry',
+        onAction: _fetchData,
       );
 
-  List<Widget> _statCards() => [
-        _statCard('$_occupiedCount', 'Occupied', Icons.bed_rounded, const Color(0xFF4F46E5)),
-        const SizedBox(width: 10),
-        _statCard('${_availableRooms.clamp(0, 99)}', 'Available',
-            Icons.door_back_door_rounded, const Color(0xFF16A34A)),
-        const SizedBox(width: 10),
-        _statCard('$_totalGuests', 'Guests', Icons.people_rounded, const Color(0xFF0891B2)),
-      ];
+  // ── Occupancy ────────────────────────────────────────────────────────────
 
-  Widget _statCard(String value, String label, IconData icon, Color color) => Expanded(
-    child: Container(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 8, offset: const Offset(0, 2))],
-      ),
-      child: Column(children: [
-        Icon(icon, color: color, size: 20),
-        const SizedBox(height: 5),
-        Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color)),
-        Text(label, style: const TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+  Widget _statsCard() {
+    final total = _roomConfig.where((r) => r['isBlocked'] != true).length;
+    final occ = _occupiedCount;
+    final ratio = total == 0 ? 0.0 : occ / total;
+    return MetricStrip(
+      [
+        Metric('$occ', 'Occupied', caption: 'of $total rooms'),
+        Metric('${_availableRooms.clamp(0, 99)}', 'Available', caption: 'to sell $_dayWord'),
+        Metric('$_totalGuests', 'Guests', caption: 'in house'),
+      ],
+      footer: Row(children: [
+        Expanded(child: ProportionBar(ratio)),
+        const SizedBox(width: AppSpace.md),
+        Text('${(ratio * 100).round()}% occupancy',
+            style: AppText.footnote.copyWith(color: AppColors.ink2, fontSize: 12)),
       ]),
-    ),
-  );
+    );
+  }
 
   // ── Room map ─────────────────────────────────────────────────────────────
 
   Widget _roomMap({required bool wrapTiles}) {
     final ground = _roomConfig.where((r) => r['floor'] == 'Ground').toList();
-    final upper  = _roomConfig.where((r) => r['floor'] == 'Upper').toList();
+    final upper = _roomConfig.where((r) => r['floor'] == 'Upper').toList();
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 8, offset: const Offset(0, 2))],
+    return SurfaceCard(
+      padding: const EdgeInsets.symmetric(vertical: AppSpace.lg),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
+          child: SectionHeader('Rooms',
+              subtitle: 'Who is in each room $_dayWord',
+              padding: const EdgeInsets.only(bottom: AppSpace.lg)),
         ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
-            child: Row(children: [
-              const Icon(Icons.hotel_rounded, color: Color(0xFF4F46E5), size: 18),
-              const SizedBox(width: 8),
-              const Text('Room Overview',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
-              const Spacer(),
-              GestureDetector(
-                onTap: _showLegend,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(6)),
-                  child: const Row(children: [
-                    Icon(Icons.info_outline, size: 13, color: Color(0xFF64748B)),
-                    SizedBox(width: 4),
-                    Text('Legend', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                  ]),
-                ),
-              ),
-            ]),
-          ),
-          if (ground.isNotEmpty) ...[
-            _floorLabel('Ground Floor'),
-            _floorRow(ground, wrapTiles),
-            const SizedBox(height: 4),
-          ],
-          if (upper.isNotEmpty) ...[
-            _floorLabel('Upper Floor'),
-            _floorRow(upper, wrapTiles),
-          ],
-          const SizedBox(height: 14),
-        ]),
-      ),
+        if (ground.isNotEmpty) ...[
+          _floorLabel('Ground floor'),
+          _floorRow(ground, wrapTiles),
+          const SizedBox(height: AppSpace.lg),
+        ],
+        if (upper.isNotEmpty) ...[
+          _floorLabel('Upper floor'),
+          _floorRow(upper, wrapTiles),
+          const SizedBox(height: AppSpace.lg),
+        ],
+        // The legend lives on the board instead of behind a dialog.
+        const Padding(
+          padding: EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.sm, AppSpace.lg, 0),
+          child: Divider(),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.md, AppSpace.lg, 0),
+          child: Wrap(spacing: 14, runSpacing: 8, children: [
+            ...AppColors.packages.entries.map((e) => LegendDot(e.value, e.key)),
+            const LegendDot(AppColors.hairlineStrong, 'Available', outlined: true),
+            const LegendDot(AppColors.blocked, 'Blocked'),
+          ]),
+        ),
+      ]),
     );
   }
 
-  void _showLegend() => showDialog(
-    context: context,
-    builder: (_) => AlertDialog(
-      title: const Text('Color Legend'),
-      content: Column(mainAxisSize: MainAxisSize.min, children: [
-        ..._pkgColor.entries.map((e) => _legendRow(e.value, e.key)),
-        _legendRow(const Color(0xFFCBD5E1), 'Available'),
-        _legendRow(const Color(0xFF475569), 'Blocked'),
-      ]),
-      actions: [TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('Close'),
-      )],
-    ),
-  );
-
-  Widget _legendRow(Color c, String label) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 4),
-    child: Row(children: [
-      Container(width: 16, height: 16,
-          decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(4))),
-      const SizedBox(width: 10),
-      Text(label, style: const TextStyle(fontSize: 13)),
-    ]),
-  );
-
-  Widget _floorLabel(String label) => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 8, 0, 6),
-    child: Text(label,
-        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF94A3B8),
-            letterSpacing: 0.5)),
-  );
+  Widget _floorLabel(String label) => Eyebrow(label,
+      padding: const EdgeInsets.fromLTRB(AppSpace.lg, 0, AppSpace.lg, AppSpace.sm));
 
   Widget _floorRow(List<Map<String, dynamic>> rooms, bool wrapTiles) {
     Widget tileFor(Map<String, dynamic> room) =>
@@ -662,181 +583,198 @@ class _HomeScreenState extends State<HomeScreen>
     // hiding rooms behind a horizontal scroll that needs a mouse drag.
     if (wrapTiles) {
       return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
         child: Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: rooms.map((r) => SizedBox(height: 120, child: tileFor(r))).toList(),
+          children: rooms.map((r) => SizedBox(height: 112, child: tileFor(r))).toList(),
         ),
       );
     }
 
     return SizedBox(
-      height: 120,
-      child: ListView.builder(
+      height: 112,
+      child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
         itemCount: rooms.length,
-        itemBuilder: (_, i) => Padding(
-          padding: const EdgeInsets.only(right: 8),
-          child: tileFor(rooms[i]),
-        ),
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (_, i) => tileFor(rooms[i]),
       ),
     );
   }
 
   Widget _roomTile(Map<String, dynamic> room, Map<String, dynamic>? info) {
-    final roomNum   = (room['roomNumber'] as String).padLeft(3, '0');
+    final roomNum = (room['roomNumber'] as String).padLeft(3, '0');
     final isBlocked = room['isBlocked'] == true;
-    final baseType  = room['baseType'] as String? ?? 'Double';
+    final baseType = room['baseType'] as String? ?? 'Double';
 
-    late Color tileColor;
-    late Color textColor;
+    late Color bg;
+    late Color fg;
+    Color border = Colors.transparent;
     String? pkgAbbr;
     String? guest;
     String? roomType;
-    int?    pax;
+    int? pax;
 
     if (isBlocked) {
-      tileColor = const Color(0xFF475569);
-      textColor = Colors.white;
+      bg = AppColors.blocked;
+      fg = Colors.white;
     } else if (info != null) {
-      final b   = info['booking'] as Map<String, dynamic>;
-      final r   = info['room']    as Map<String, dynamic>;
+      final b = info['booking'] as Map<String, dynamic>;
+      final r = info['room'] as Map<String, dynamic>;
       final pkg = b['package'] as String? ?? '';
-      tileColor = _pkgColor[pkg] ?? const Color(0xFF64748B);
-      textColor = Colors.white;
-      pkgAbbr   = _pkgAbbrev[pkg] ?? pkg;
-      guest     = (b['guestName'] as String? ?? 'Guest').split(' ').first;
-      roomType  = r['roomType'] as String? ?? baseType;
-      pax       = r['pax'] as int? ?? 0;
+      bg = AppColors.forPackage(pkg);
+      fg = Colors.white;
+      pkgAbbr = _pkgAbbrev[pkg] ?? pkg;
+      guest = (b['guestName'] as String? ?? 'Guest').split(' ').first;
+      roomType = r['roomType'] as String? ?? baseType;
+      pax = r['pax'] as int? ?? 0;
     } else {
-      tileColor = const Color(0xFFE2E8F0);
-      textColor = const Color(0xFF94A3B8);
+      bg = AppColors.surface;
+      fg = AppColors.ink;
+      border = AppColors.hairlineStrong;
     }
 
-    return Container(
-      width: 88,
+    final occupied = info != null && !isBlocked;
+    return AnimatedContainer(
+      duration: AppMotion.base,
+      curve: AppMotion.ease,
+      width: 92,
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: tileColor,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(
-          color: Colors.black.withValues(alpha: info != null ? 0.14 : 0.05),
-          blurRadius: 6, offset: const Offset(0, 2),
-        )],
+        color: bg,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: border),
+        boxShadow: occupied
+            ? [BoxShadow(color: bg.withValues(alpha: 0.28), blurRadius: 10, offset: const Offset(0, 4))]
+            : null,
       ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            // Top row: room number + badge
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Text(roomNum,
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textColor)),
-              if (pkgAbbr != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.22),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(pkgAbbr,
-                      style: const TextStyle(fontSize: 8, color: Colors.white, fontWeight: FontWeight.bold)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Text(roomNum, style: AppText.number(14, color: fg)),
+            if (pkgAbbr != null)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(5),
                 ),
-              if (isBlocked)
-                Icon(Icons.lock_rounded, color: textColor.withValues(alpha: 0.7), size: 11),
-            ]),
-            // Bottom info block
-            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              if (isBlocked)
-                Text('Manager', style: TextStyle(fontSize: 10, color: textColor.withValues(alpha: 0.8)))
-              else if (info != null) ...[
-                Text(guest ?? '',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: textColor),
-                    overflow: TextOverflow.ellipsis, maxLines: 1),
-                const SizedBox(height: 2),
-                Text(_shortType(roomType ?? ''),
-                    style: TextStyle(fontSize: 9, color: textColor.withValues(alpha: 0.85))),
-                const SizedBox(height: 1),
-                Row(children: [
-                  Icon(Icons.person, size: 9, color: textColor.withValues(alpha: 0.8)),
-                  const SizedBox(width: 2),
-                  Text('${pax}pax', style: TextStyle(fontSize: 9, color: textColor.withValues(alpha: 0.8))),
-                ]),
-              ] else ...[
-                Text(baseType, style: TextStyle(fontSize: 10, color: textColor)),
-                Text('Free', style: TextStyle(fontSize: 9, color: textColor.withValues(alpha: 0.65))),
-              ],
-            ]),
-          ],
-        ),
+                child: Text(pkgAbbr,
+                    style: AppText.eyebrow.copyWith(
+                        fontSize: 9, color: Colors.white, letterSpacing: 0.4)),
+              ),
+            if (isBlocked) Icon(Icons.lock_rounded, color: fg.withValues(alpha: 0.7), size: 13),
+          ]),
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            if (isBlocked)
+              Text('Manager',
+                  style: AppText.footnote.copyWith(fontSize: 12, color: fg.withValues(alpha: 0.8)))
+            else if (info != null) ...[
+              Text(guest ?? '',
+                  style: AppText.bodyStrong.copyWith(fontSize: 13, color: fg, height: 1.2),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1),
+              const SizedBox(height: 2),
+              Text('${_shortType(roomType ?? '')} · $pax pax',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.footnote.copyWith(
+                      fontSize: 11, color: fg.withValues(alpha: 0.82), height: 1.2)),
+            ] else ...[
+              Text(baseType,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.footnote.copyWith(fontSize: 12, color: AppColors.ink2)),
+              Text('Free',
+                  style: AppText.footnote.copyWith(
+                      fontSize: 11, color: AppColors.success, fontWeight: FontWeight.w600)),
+            ],
+          ]),
+        ],
       ),
     );
   }
 
   String _shortType(String t) => const {
-    'Family Plus': 'Fam+',
-    'Family':      'Family',
-    'Triple':      'Triple',
-    'Double':      'Double',
-  }[t] ?? t;
+        'Family Plus': 'Fam+',
+        'Family': 'Family',
+        'Triple': 'Triple',
+        'Double': 'Double',
+      }[t] ?? t;
 
   // ── Meal section ──────────────────────────────────────────────────────────
 
   Widget _mealSection() {
     final m = _meals;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 8, offset: const Offset(0, 2))],
+    final pkgCounts = <String, int>{
+      for (final pkg in AppColors.packages.keys)
+        pkg: _active.where((b) => b['package'] == pkg).length,
+    }..removeWhere((_, v) => v == 0);
+
+    Widget cell(String label, int pax, IconData icon, Color color) => Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Icon(icon, size: 16, color: color),
+              const SizedBox(width: 6),
+              Text(label, style: AppText.footnote.copyWith(color: AppColors.ink2)),
+            ]),
+            const SizedBox(height: 8),
+            AnimatedSwitcher(
+              duration: AppMotion.base,
+              child: Text('$pax',
+                  key: ValueKey('$label$pax'), style: AppText.number(28)),
+            ),
+            Text('covers', style: AppText.footnote.copyWith(fontSize: 12)),
+          ]),
+        );
+
+    return SurfaceCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        SectionHeader('Meals', subtitle: 'Kitchen covers for $_dayWord'),
+        IntrinsicHeight(
+          child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            cell('Breakfast', m['breakfast']!, Icons.wb_twilight_rounded, AppColors.breakfast),
+            const VerticalDivider(width: 24),
+            cell('Lunch', m['lunch']!, Icons.light_mode_rounded, AppColors.lunch),
+            const VerticalDivider(width: 24),
+            cell('Dinner', m['dinner']!, Icons.nightlight_round, AppColors.dinner),
+          ]),
         ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 14, 16, 10),
-            child: Row(children: [
-              Icon(Icons.restaurant_menu_rounded, color: Color(0xFF4F46E5), size: 18),
-              SizedBox(width: 8),
-              Text('Meal Count', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B))),
-            ]),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 14),
-            child: Row(children: [
-              _mealCard('Breakfast', m['breakfast']!, Icons.wb_sunny_rounded,    const Color(0xFFF59E0B)),
-              const SizedBox(width: 8),
-              _mealCard('Lunch',     m['lunch']!,     Icons.restaurant_rounded,  const Color(0xFF16A34A)),
-              const SizedBox(width: 8),
-              _mealCard('Dinner',    m['dinner']!,    Icons.dinner_dining_rounded, const Color(0xFF7C3AED)),
-            ]),
-          ),
-          // Package breakdown
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 14),
-            child: Wrap(spacing: 6, runSpacing: 6, children: _pkgColor.keys.map((pkg) {
-              final count = _active.where((b) => b['package'] == pkg).length;
-              if (count == 0) return const SizedBox.shrink();
-              final color = _pkgColor[pkg]!;
+        if (pkgCounts.isNotEmpty) ...[
+          const SizedBox(height: AppSpace.lg),
+          const Divider(),
+          const SizedBox(height: AppSpace.md),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: pkgCounts.entries.map((e) {
+              final color = AppColors.forPackage(e.key);
               return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: color.withValues(alpha: 0.3)),
+                  color: AppColors.canvas,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.hairline),
                 ),
-                child: Text('${_pkgAbbrev[pkg]} × $count',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+                  const SizedBox(width: 6),
+                  Text(e.key, style: AppText.footnote.copyWith(color: AppColors.ink2)),
+                  const SizedBox(width: 6),
+                  Text('${e.value}', style: AppText.number(13)),
+                ]),
               );
-            }).toList()),
+            }).toList(),
           ),
-        ]),
-      ),
+        ],
+      ]),
     );
   }
 
@@ -848,117 +786,74 @@ class _HomeScreenState extends State<HomeScreen>
     if (early.isEmpty && late.isEmpty) return const SizedBox.shrink();
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 8, offset: const Offset(0, 2))],
-        ),
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+      padding: const EdgeInsets.only(top: AppSpace.lg),
+      child: SurfaceCard(
+        padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.lg, AppSpace.lg, AppSpace.sm),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Row(children: [
-            Icon(Icons.schedule_rounded, color: Color(0xFF4F46E5), size: 18),
-            SizedBox(width: 8),
-            Text('Early Arrivals & Late Departures', style: TextStyle(fontSize: 15,
-                fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
-          ]),
-          const SizedBox(height: 8),
+          SectionHeader('Early arrivals & late departures',
+              subtitle: 'Have these rooms and meals ready',
+              padding: const EdgeInsets.only(bottom: AppSpace.sm)),
           ...early.map((b) => _timingRow(b, 'Early check-in',
-              formatStayTime(b['earlyCheckInTime']), const Color(0xFF16A34A), Icons.login_rounded)),
+              formatStayTime(b['earlyCheckInTime']), AppColors.success, Icons.login_rounded)),
           ...late.map((b) => _timingRow(b, 'Late check-out',
-              formatStayTime(b['lateCheckOutTime']), const Color(0xFFEA580C), Icons.logout_rounded)),
+              formatStayTime(b['lateCheckOutTime']), AppColors.warning, Icons.logout_rounded)),
         ]),
       ),
     );
   }
 
-  Widget _timingRow(Map<String, dynamic> b, String label, String? time, Color color, IconData icon) {
+  Widget _timingRow(
+      Map<String, dynamic> b, String label, String? time, Color color, IconData icon) {
     final rooms = b['rooms'] as List?;
     final roomText = (rooms != null && rooms.isNotEmpty)
         ? rooms.map((r) => r['roomNumber'].toString()).join(', ')
         : (b['roomNumber']?.toString() ?? '');
     final guest = (b['guestName'] as String?)?.trim() ?? '';
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(children: [
-        Icon(icon, size: 16, color: color),
-        const SizedBox(width: 8),
+        IconWell(icon, color: color, size: 36),
+        const SizedBox(width: AppSpace.md),
         Expanded(
-          child: Text(
-            '${guest.isEmpty ? 'Guest' : guest}${roomText.isEmpty ? '' : ' · Room $roomText'}',
-            style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B)),
-            overflow: TextOverflow.ellipsis,
-          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(guest.isEmpty ? 'Guest' : guest,
+                overflow: TextOverflow.ellipsis, style: AppText.bodyStrong.copyWith(fontSize: 14)),
+            Text('$label${roomText.isEmpty ? '' : ' · Room $roomText'}',
+                overflow: TextOverflow.ellipsis, style: AppText.footnote),
+          ]),
         ),
         const SizedBox(width: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text('$label · ${time ?? 'time not set'}',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
-        ),
+        StatusPill(time ?? 'Time not set', color: time == null ? AppColors.ink3 : color),
       ]),
     );
   }
 
-  Widget _mealCard(String label, int pax, IconData icon, Color color) => Expanded(
-    child: Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.18)),
-      ),
-      child: Column(children: [
-        Icon(icon, color: color, size: 22),
-        const SizedBox(height: 4),
-        Text('$pax', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color)),
-        Text('pax', style: TextStyle(fontSize: 10, color: color.withValues(alpha: 0.75))),
-        const SizedBox(height: 2),
-        Text(label,
-            style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-            textAlign: TextAlign.center),
-      ]),
-    ),
-  );
-
   // ── Quick actions ─────────────────────────────────────────────────────────
 
-  /// The four the front desk uses all day — these get the bottom bar slots.
+  /// The ones the front desk uses all day — these get the bottom bar slots.
+  static final _newBooking =
+      _QuickAction('New booking', Icons.add_rounded, () => RoomSelectionScreen());
+
   static final List<_QuickAction> _primaryActions = [
-    _QuickAction('New Booking', Icons.add_circle_rounded, const Color(0xFF4F46E5),
-        () => RoomSelectionScreen()),
-    _QuickAction('Bookings', Icons.calendar_month_rounded, const Color(0xFF16A34A),
-        () => ViewBookingsScreen()),
-    _QuickAction('Invoice', Icons.receipt_long_rounded, const Color(0xFFEF4444),
-        () => GenerateInvoiceScreen()),
-    _QuickAction('Inventory', Icons.inventory_2_rounded, const Color(0xFFF59E0B),
-        () => AddInventoryItemScreen()),
+    _QuickAction('Bookings', Icons.calendar_month_outlined, () => ViewBookingsScreen()),
+    _QuickAction('Invoice', Icons.receipt_long_outlined, () => GenerateInvoiceScreen()),
+    _QuickAction('Inventory', Icons.inventory_2_outlined, () => AddInventoryItemScreen()),
   ];
 
-  /// Everything else — behind "More" on phones, in the grid on desktop.
+  /// Everything else — behind "More" on phones, in the list on desktop.
   static final List<_QuickAction> _moreActions = [
-    _QuickAction('Guests', Icons.people_alt_rounded, const Color(0xFFDB2777),
-        () => const GuestsListScreen()),
-    _QuickAction('Profit', Icons.analytics_rounded, const Color(0xFF8B5CF6),
-        () => CalculateProfitPage()),
-    _QuickAction('Expenses', Icons.attach_money_rounded, const Color(0xFF0891B2),
+    _QuickAction('Guests', Icons.people_alt_outlined, () => const GuestsListScreen()),
+    _QuickAction('Profit', Icons.insights_rounded, () => CalculateProfitPage()),
+    _QuickAction('Expenses & salaries', Icons.account_balance_wallet_outlined,
         () => ExpensesAndSalaryScreen()),
-    _QuickAction('Room Config', Icons.meeting_room_rounded, const Color(0xFF475569),
-        () => RoomConfigScreen()),
+    _QuickAction('Room setup', Icons.meeting_room_outlined, () => RoomConfigScreen()),
   ];
 
   /// Managing who can sign in is owner-only, so this tile is added at build
   /// time rather than living in the static list. The backend enforces the same
   /// rule — hiding it here is convenience, not the control.
   static final _userAccessAction = _QuickAction(
-      'User Access', Icons.admin_panel_settings_rounded, const Color(0xFF0F766E),
-      () => const UserAccessScreen());
+      'User access', Icons.admin_panel_settings_outlined, () => const UserAccessScreen());
 
   List<_QuickAction> get _visibleMoreActions => [
         ..._moreActions,
@@ -974,100 +869,111 @@ class _HomeScreenState extends State<HomeScreen>
 
   Widget _quickActions() {
     final actions = [..._primaryActions, ..._visibleMoreActions];
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Quick Actions',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
-        const SizedBox(height: 12),
-        LayoutBuilder(builder: (context, c) {
-          const gap = 10.0;
-          // Aim for ~100px tiles, capped at 4 columns so the 8 actions stay in a
-          // tidy block instead of stretching into one long row on desktop.
-          final cols = ((c.maxWidth + gap) / 100).floor().clamp(2, 4);
-          final tileW = (c.maxWidth - gap * (cols - 1)) / cols;
-          return Wrap(
-            spacing: gap,
-            runSpacing: gap,
-            children: actions
-                .map((a) => SizedBox(width: tileW, height: 96, child: _actionTile(a)))
-                .toList(),
-          );
-        }),
-      ]),
-    );
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      FilledButton.icon(
+        onPressed: () => _open(_newBooking),
+        icon: const Icon(Icons.add_rounded, size: 20),
+        label: const Text('New booking'),
+        style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+      ),
+      const SizedBox(height: AppSpace.md),
+      _actionList(actions, dense: false),
+    ]);
   }
 
-  Widget _actionTile(_QuickAction a) => Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        elevation: 1,
-        shadowColor: Colors.black.withValues(alpha: 0.18),
+  /// Grouped list in one card, Settings-style: icon well, label, chevron.
+  Widget _actionList(List<_QuickAction> actions,
+      {required bool dense, VoidCallback? beforeOpen}) {
+    final rows = <Widget>[];
+    for (var i = 0; i < actions.length; i++) {
+      final a = actions[i];
+      if (i > 0) {
+        rows.add(const Padding(
+            padding: EdgeInsets.only(left: 64), child: Divider(height: 1)));
+      }
+      rows.add(Material(
+        color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(14),
-          onTap: () => _open(a),
+          onTap: () {
+            beforeOpen?.call();
+            _open(a);
+          },
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: a.color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(13),
-                ),
-                child: Icon(a.icon, color: a.color, size: 23),
-              ),
-              const SizedBox(height: 8),
-              Text(a.label,
-                  style: const TextStyle(
-                      fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF334155),
-                      height: 1.1),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis),
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: dense ? 8 : 10),
+            child: Row(children: [
+              IconWell(a.icon, size: 36),
+              const SizedBox(width: 14),
+              Expanded(child: Text(a.label, style: AppText.bodyStrong.copyWith(fontSize: 15))),
+              const Icon(Icons.chevron_right_rounded, color: AppColors.ink4, size: 22),
             ]),
           ),
         ),
-      );
+      ));
+    }
+    return ClipRRect(
+      borderRadius: AppRadius.card,
+      child: SurfaceCard(padding: const EdgeInsets.symmetric(vertical: 4), child: Column(children: rows)),
+    );
+  }
 
   // ── Bottom action bar (phones) ─────────────────────────────────────────────
 
-  Widget _bottomBar() => Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 12, offset: const Offset(0, -2))],
-        ),
+  Widget _bottomBar() => Frosted(
+        tint: AppColors.surface,
+        opacity: 0.86,
+        border: const Border(top: BorderSide(color: AppColors.hairline, width: 0.5)),
         child: SafeArea(
           top: false,
           child: SizedBox(
-            height: 62,
+            height: 64,
             child: Row(
               children: [
-                ..._primaryActions.map((a) => _bottomBarItem(
-                    a.label, a.icon, a.color, () => _open(a))),
-                _bottomBarItem('More', Icons.grid_view_rounded,
-                    const Color(0xFF64748B), _showMoreSheet),
+                _bottomBarItem(_primaryActions[0]),
+                _bottomBarItem(_primaryActions[1]),
+                // The everyday job sits in the middle of the thumb's reach.
+                Expanded(
+                  child: Center(
+                    child: Pressable(
+                      onTap: () => _open(_newBooking),
+                      pressedScale: 0.92,
+                      semanticLabel: 'New booking',
+                      child: Container(
+                        width: 54,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: AppColors.ink,
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: const [
+                            BoxShadow(color: Color(0x33121614), blurRadius: 12, offset: Offset(0, 4)),
+                          ],
+                        ),
+                        child: const Icon(Icons.add_rounded, color: Colors.white, size: 26),
+                      ),
+                    ),
+                  ),
+                ),
+                _bottomBarItem(_primaryActions[2]),
+                _bottomBarItem(_QuickAction('More', Icons.grid_view_rounded, () => const SizedBox()),
+                    onTap: _showMoreSheet),
               ],
             ),
           ),
         ),
       );
 
-  Widget _bottomBarItem(String label, IconData icon, Color color, VoidCallback onTap) =>
-      Expanded(
-        child: InkWell(
-          onTap: onTap,
+  Widget _bottomBarItem(_QuickAction a, {VoidCallback? onTap}) => Expanded(
+        child: Pressable(
+          onTap: onTap ?? () => _open(a),
+          pressedScale: 0.9,
+          semanticLabel: a.label,
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, color: color, size: 23),
-              const SizedBox(height: 3),
-              Text(label,
-                  style: TextStyle(
-                      fontSize: 10, fontWeight: FontWeight.w600, color: color),
+              Icon(a.icon, color: AppColors.ink, size: 23),
+              const SizedBox(height: 4),
+              Text(a.label,
+                  style: AppText.footnote.copyWith(
+                      fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.ink2),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis),
             ],
@@ -1077,53 +983,23 @@ class _HomeScreenState extends State<HomeScreen>
 
   void _showMoreSheet() => showModalBottomSheet(
         context: context,
-        backgroundColor: Colors.white,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
+        backgroundColor: AppColors.canvas,
         builder: (sheetCtx) => SafeArea(
           top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40, height: 4,
-                  margin: const EdgeInsets.only(top: 10, bottom: 14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFCBD5E1),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
+                  child: Text('More', style: AppText.title),
                 ),
-              ),
-              const Padding(
-                padding: EdgeInsets.fromLTRB(20, 0, 20, 6),
-                child: Text('More',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E293B))),
-              ),
-              ..._visibleMoreActions.map((a) => ListTile(
-                    leading: Container(
-                      width: 40, height: 40,
-                      decoration: BoxDecoration(
-                        color: a.color.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(a.icon, color: a.color, size: 21),
-                    ),
-                    title: Text(a.label,
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600,
-                            color: Color(0xFF334155))),
-                    trailing: const Icon(Icons.chevron_right_rounded,
-                        color: Color(0xFF94A3B8)),
-                    onTap: () {
-                      Navigator.pop(sheetCtx);
-                      _open(a);
-                    },
-                  )),
-              const SizedBox(height: 8),
-            ],
+                _actionList(_visibleMoreActions,
+                    dense: true, beforeOpen: () => Navigator.pop(sheetCtx)),
+              ],
+            ),
           ),
         ),
       );
@@ -1132,7 +1008,6 @@ class _HomeScreenState extends State<HomeScreen>
 class _QuickAction {
   final String label;
   final IconData icon;
-  final Color color;
   final Widget Function() builder;
-  const _QuickAction(this.label, this.icon, this.color, this.builder);
+  const _QuickAction(this.label, this.icon, this.builder);
 }
