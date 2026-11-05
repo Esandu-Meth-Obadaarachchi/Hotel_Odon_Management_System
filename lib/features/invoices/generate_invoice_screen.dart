@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:odon_booking/shared/widgets/odon_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'invoice.dart' as invoice;
@@ -263,7 +264,7 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
       lastDate: DateTime(2100),
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
-          colorScheme: const ColorScheme.light(primary: Colors.indigo, onPrimary: Colors.white),
+          colorScheme: const ColorScheme.light(primary: AppColors.ink, onPrimary: Colors.white),
         ),
         child: child!,
       ),
@@ -291,53 +292,18 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
     final fmt = NumberFormat('#,##0.00');
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F6FA),
       body: Form(
         key: _formKey,
         child: CustomScrollView(
           slivers: [
-            // Gradient header
-            SliverAppBar(
-              expandedHeight: 120,
-              pinned: true,
-              backgroundColor: Colors.indigo,
-              iconTheme: const IconThemeData(color: Colors.white),
-              flexibleSpace: FlexibleSpaceBar(
-                titlePadding: const EdgeInsets.fromLTRB(56, 0, 16, 16),
-                title: const Text(
-                  'Generate Invoice',
-                  style: TextStyle(
-                    fontFamily: 'Outfit',
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    fontSize: 20,
-                  ),
-                ),
-                background: Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFF312E81), Color(0xFF4F46E5)],
-                    ),
-                  ),
-                  child: Align(
-                    alignment: Alignment.bottomRight,
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Icon(
-                        Icons.receipt_long_rounded,
-                        size: 56,
-                        color: Colors.white.withValues(alpha: 0.12),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+            LargeTitleSliverAppBar(
+              title: 'Invoice',
+              subtitle: 'Quote a stay and share the PDF',
+              maxWidth: AppLayout.maxForm,
               actions: [
                 IconButton(
-                  icon: const Icon(Icons.tune_rounded, color: Colors.white),
-                  tooltip: 'Edit Room Prices',
+                  icon: const Icon(Icons.tune_rounded),
+                  tooltip: 'Edit room prices',
                   onPressed: () async {
                     await Navigator.push(
                       context,
@@ -346,17 +312,19 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                     _fetchPrices();
                   },
                 ),
+                const SizedBox(width: 4),
               ],
             ),
 
             SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
+              child: PageBody(
+                maxWidth: AppLayout.maxForm,
+                padding: EdgeInsets.fromLTRB(AppLayout.gutter(context), 8, AppLayout.gutter(context), 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // ── Guest details ───────────────────────────────────
-                    _sectionLabel('Guest Details'),
+                    _sectionLabel('Guest'),
                     const SizedBox(height: 10),
                     _card(
                       child: Column(
@@ -387,7 +355,7 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                     const SizedBox(height: 20),
 
                     // ── Stay dates ──────────────────────────────────────
-                    _sectionLabel('Stay Dates'),
+                    _sectionLabel('Stay'),
                     const SizedBox(height: 10),
                     _card(
                       child: Column(
@@ -402,8 +370,8 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                               )),
                               Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 10),
-                                child: Icon(Icons.arrow_forward_rounded,
-                                    size: 16, color: Colors.grey.shade400),
+                                child: const Icon(Icons.arrow_forward_rounded,
+                                    size: 16, color: AppColors.ink3),
                               ),
                               Expanded(child: _dateTile(
                                 label: 'Check-Out',
@@ -454,7 +422,7 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                                     width: 28,
                                     height: 28,
                                     decoration: BoxDecoration(
-                                      color: Colors.indigo.shade50,
+                                      color: AppColors.sunken,
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Center(
@@ -463,19 +431,13 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                                         style: TextStyle(
                                           fontWeight: FontWeight.w700,
                                           fontSize: 13,
-                                          color: Colors.indigo.shade700,
+                                          color: AppColors.ink,
                                         ),
                                       ),
                                     ),
                                   ),
                                   const SizedBox(width: 10),
-                                  Text(
-                                    'Room ${index + 1}',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 14,
-                                    ),
-                                  ),
+                                  Text('Room ${index + 1}', style: AppText.bodyStrong.copyWith(fontSize: 14)),
                                   const Spacer(),
                                   if (_selectedRooms.length > 1)
                                     InkWell(
@@ -484,11 +446,11 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                                       child: Container(
                                         padding: const EdgeInsets.all(6),
                                         decoration: BoxDecoration(
-                                          color: Colors.red.shade50,
+                                          color: AppColors.sunken,
                                           borderRadius: BorderRadius.circular(8),
                                         ),
-                                        child: Icon(Icons.delete_outline_rounded,
-                                            color: Colors.red.shade400, size: 16),
+                                        child: const Icon(Icons.delete_outline_rounded,
+                                            color: AppColors.ink2, size: 16),
                                       ),
                                     ),
                                 ],
@@ -498,21 +460,7 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                                 value: room.type,
                                 decoration: InputDecoration(
                                   labelText: 'Room Type',
-                                  prefixIcon: Icon(Icons.hotel_rounded,
-                                      color: Colors.indigo.shade400, size: 20),
-                                  border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(10)),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: BorderSide(color: Colors.grey.shade200),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: const BorderSide(
-                                        color: Colors.indigo, width: 2),
-                                  ),
-                                  filled: true,
-                                  fillColor: Colors.grey.shade50,
+                                  prefixIcon: const Icon(Icons.hotel_rounded, size: 20),
                                 ),
                                 items: ['Single', 'Double', 'Triple', 'Family', 'Family Plus']
                                     .map((v) => DropdownMenuItem(value: v, child: Text(v)))
@@ -526,18 +474,14 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                                 children: [
                                   Text(
                                     'Quantity',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.grey.shade700,
-                                    ),
+                                    style: AppText.callout,
                                   ),
                                   const Spacer(),
                                   Container(
                                     decoration: BoxDecoration(
-                                      color: Colors.grey.shade50,
+                                      color: AppColors.surface,
                                       borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(color: Colors.grey.shade200),
+                                      border: Border.all(color: AppColors.hairlineStrong),
                                     ),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
@@ -554,10 +498,7 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                                           child: Text(
                                             '${room.quantity}',
                                             textAlign: TextAlign.center,
-                                            style: const TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold,
-                                            ),
+                                            style: AppText.number(16),
                                           ),
                                         ),
                                         _qtyButton(
@@ -578,51 +519,35 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                     TextButton.icon(
                       icon: const Icon(Icons.add_rounded, size: 18),
                       label: const Text('Add Another Room'),
-                      style: TextButton.styleFrom(foregroundColor: Colors.indigo),
+                      style: TextButton.styleFrom(foregroundColor: AppColors.ink),
                       onPressed: _addRoom,
                     ),
                     const SizedBox(height: 12),
 
                     // ── Head count ──────────────────────────────────────
-                    _sectionLabel('Head Count'),
+                    _sectionLabel('Guests'),
                     const SizedBox(height: 10),
                     _buildHeadCount(),
                     const SizedBox(height: 20),
 
                     // ── Package & Options ───────────────────────────────
-                    _sectionLabel('Package & Options'),
+                    _sectionLabel('Meal plan & options'),
                     const SizedBox(height: 10),
                     _card(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          DropdownButtonFormField<String>(
+                          ChoiceChipGroup(
+                            items: const ['Room Only', 'Bed and Breakfast', 'Half Board', 'Full Board', 'Room + Dinner'],
                             value: _packageType,
-                            decoration: InputDecoration(
-                              labelText: 'Package',
-                              prefixIcon: Icon(Icons.restaurant_menu_rounded,
-                                  color: Colors.indigo.shade400, size: 20),
-                              border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10)),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: BorderSide(color: Colors.grey.shade200),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide:
-                                    const BorderSide(color: Colors.indigo, width: 2),
-                              ),
-                              filled: true,
-                              fillColor: Colors.grey.shade50,
-                            ),
-                            items: ['Room Only', 'Bed and Breakfast', 'Half Board',
-                                    'Full Board', 'Room + Dinner']
-                                .map((v) => DropdownMenuItem(value: v, child: Text(v)))
-                                .toList(),
+                            dotColor: (p) => AppColors.forPackage(const {
+                                  'Bed and Breakfast': 'BnB',
+                                  'Room + Dinner': 'Dinner Only',
+                                }[p] ?? p),
                             onChanged: (v) {
+                              if (v == null) return;
                               setState(() {
-                                _packageType = v!;
+                                _packageType = v;
                                 _updateDayPackages();
                               });
                             },
@@ -630,15 +555,7 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                           if (_packageType == 'Full Board' ||
                               _packageType == 'Half Board') ...[
                             const SizedBox(height: 16),
-                            Text(
-                              'FIRST MEAL ON ARRIVAL',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.grey.shade500,
-                                letterSpacing: 1.0,
-                              ),
-                            ),
+                            Text('First meal on arrival', style: AppText.footnote.copyWith(color: AppColors.ink2)),
                             const SizedBox(height: 8),
                             Row(
                               children: ['Lunch', 'Dinner'].map((meal) {
@@ -655,13 +572,13 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                                         padding: const EdgeInsets.symmetric(vertical: 12),
                                         decoration: BoxDecoration(
                                           color: selected
-                                              ? Colors.indigo
-                                              : Colors.grey.shade50,
+                                              ? AppColors.ink
+                                              : AppColors.surface,
                                           borderRadius: BorderRadius.circular(10),
                                           border: Border.all(
                                             color: selected
-                                                ? Colors.indigo
-                                                : Colors.grey.shade200,
+                                                ? AppColors.ink
+                                                : AppColors.hairlineStrong,
                                           ),
                                         ),
                                         child: Center(
@@ -672,7 +589,7 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                                               fontWeight: FontWeight.w600,
                                               color: selected
                                                   ? Colors.white
-                                                  : Colors.grey.shade600,
+                                                  : AppColors.ink,
                                             ),
                                           ),
                                         ),
@@ -683,13 +600,13 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                               }).toList(),
                             ),
                           ],
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 16),
                           // Driver room toggle
                           _toggleRow(
                             icon: Icons.directions_car_rounded,
-                            iconColor: Colors.amber.shade700,
+                            iconColor: AppColors.warning,
                             iconBg: Colors.amber.shade50,
-                            title: 'Driver Room',
+                            title: 'Driver room',
                             subtitle:
                                 'LKR ${fmt.format(_driverRoomPrice)}/night',
                             value: _includeDriverRoom,
@@ -701,9 +618,9 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                           const SizedBox(height: 8),
                           _toggleRow(
                             icon: Icons.rice_bowl_rounded,
-                            iconColor: Colors.teal.shade700,
+                            iconColor: AppColors.roomOnly,
                             iconBg: Colors.teal.shade50,
-                            title: 'Need Kiri Pidu',
+                            title: 'Kiri pidu',
                             subtitle: 'Prepare kiri pidu for this booking',
                             value: _needKiriPidu,
                             onChanged: (v) => setState(() => _needKiriPidu = v),
@@ -711,9 +628,9 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                           const SizedBox(height: 8),
                           _toggleRow(
                             icon: Icons.schedule_rounded,
-                            iconColor: Colors.green.shade700,
+                            iconColor: AppColors.success,
                             iconBg: Colors.green.shade50,
-                            title: 'Early Check-in',
+                            title: 'Early check-in',
                             subtitle: 'Arriving before 2:00 PM',
                             value: _earlyCheckIn,
                             onChanged: (v) => setState(() => _earlyCheckIn = v),
@@ -730,9 +647,9 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                           const SizedBox(height: 8),
                           _toggleRow(
                             icon: Icons.more_time_rounded,
-                            iconColor: Colors.deepOrange.shade700,
+                            iconColor: AppColors.warning,
                             iconBg: Colors.deepOrange.shade50,
-                            title: 'Late Check-out',
+                            title: 'Late check-out',
                             subtitle: 'Leaving after 11:00 AM',
                             value: _lateCheckOut,
                             onChanged: (v) => setState(() => _lateCheckOut = v),
@@ -750,7 +667,7 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                           // Day customization toggle
                           _toggleRow(
                             icon: Icons.calendar_month_rounded,
-                            iconColor: Colors.teal.shade700,
+                            iconColor: AppColors.roomOnly,
                             iconBg: Colors.teal.shade50,
                             title: 'Custom per-day packages',
                             subtitle: 'Different package for each night',
@@ -772,7 +689,7 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                     const SizedBox(height: 20),
 
                     // ── Extra charges ───────────────────────────────────
-                    _sectionLabel('Extra Charges'),
+                    _sectionLabel('Extra charges'),
                     const SizedBox(height: 10),
                     ..._extraCharges.asMap().entries.map((entry) {
                       final index = entry.key;
@@ -790,20 +707,6 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                                   decoration: InputDecoration(
                                     labelText: 'Reason',
                                     hintText: 'e.g. Airport Transfer',
-                                    border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(10)),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                      borderSide:
-                                          BorderSide(color: Colors.grey.shade200),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                      borderSide: const BorderSide(
-                                          color: Colors.indigo, width: 2),
-                                    ),
-                                    filled: true,
-                                    fillColor: Colors.grey.shade50,
                                     isDense: true,
                                   ),
                                   onChanged: (v) => _updateExtraChargeReason(index, v),
@@ -818,20 +721,6 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                                   keyboardType: TextInputType.number,
                                   decoration: InputDecoration(
                                     labelText: 'LKR',
-                                    border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(10)),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                      borderSide:
-                                          BorderSide(color: Colors.grey.shade200),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                      borderSide: const BorderSide(
-                                          color: Colors.indigo, width: 2),
-                                    ),
-                                    filled: true,
-                                    fillColor: Colors.grey.shade50,
                                     isDense: true,
                                   ),
                                   onChanged: (v) =>
@@ -844,8 +733,8 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                                 onTap: () => _removeExtraCharge(index),
                                 child: Padding(
                                   padding: const EdgeInsets.all(8),
-                                  child: Icon(Icons.delete_outline_rounded,
-                                      color: Colors.red.shade400, size: 20),
+                                  child: const Icon(Icons.delete_outline_rounded,
+                                      color: AppColors.ink3, size: 20),
                                 ),
                               ),
                             ],
@@ -856,7 +745,7 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                     TextButton.icon(
                       icon: const Icon(Icons.add_rounded, size: 18),
                       label: const Text('Add Extra Charge'),
-                      style: TextButton.styleFrom(foregroundColor: Colors.indigo),
+                      style: TextButton.styleFrom(foregroundColor: AppColors.ink),
                       onPressed: _addExtraCharge,
                     ),
                     const SizedBox(height: 12),
@@ -900,41 +789,15 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                     const SizedBox(height: 28),
 
                     // ── Generate button ─────────────────────────────────
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF312E81), Color(0xFF4F46E5)],
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            if (_formKey.currentState!.validate()) {
-                              _generateInvoice();
-                            }
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.transparent,
-                            shadowColor: Colors.transparent,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          icon: const Icon(Icons.picture_as_pdf_rounded, size: 20),
-                          label: const Text(
-                            'Generate Invoice',
-                            style: TextStyle(
-                              fontFamily: 'Outfit',
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ),
+                    FilledButton.icon(
+                      onPressed: () {
+                        if (_formKey.currentState!.validate()) {
+                          _generateInvoice();
+                        }
+                      },
+                      style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(54)),
+                      icon: const Icon(Icons.picture_as_pdf_outlined, size: 20),
+                      label: const Text('Generate invoice'),
                     ),
                     const SizedBox(height: 24),
                   ],
@@ -950,129 +813,54 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
   Widget _buildSummaryCard(NumberFormat fmt) {
     final nights = _checkOutDate!.difference(_checkInDate!).inDays;
     final subtotal = _totalAmount + _discount + _additionalDiscount - _totalExtraCharges;
-    final netColor = _totalAmount >= 0 ? const Color(0xFF16A34A) : Colors.red;
+    final netColor = _totalAmount >= 0 ? AppColors.ink : AppColors.danger;
 
-    return Card(
-      elevation: 0,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: Colors.indigo.shade100),
-      ),
+    return SurfaceCard(
+      padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
+          Row(
+            children: [
+              Text('Summary', style: AppText.headline),
+              const Spacer(),
+              StatusPill('$nights night${nights == 1 ? '' : 's'}', icon: Icons.nights_stay_outlined),
+            ],
+          ),
+          const SizedBox(height: 14),
+          ..._selectedRooms.map((room) => _summaryRow('${room.quantity} × ${room.type} room', '')),
+          if (_includeDriverRoom) _summaryRow('1 × Driver room', ''),
+          const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Divider()),
+          _summaryRow('Subtotal', 'LKR ${fmt.format(subtotal)}', bold: true),
+          if (_discount > 0)
+            _summaryRow('Standard discount', '− LKR ${fmt.format(_discount)}'),
+          if (_additionalDiscount > 0)
+            _summaryRow('Additional discount', '− LKR ${fmt.format(_additionalDiscount)}'),
+          if (_totalExtraCharges > 0)
+            _summaryRow('Extra charges', '+ LKR ${fmt.format(_totalExtraCharges)}'),
+          const SizedBox(height: 12),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.indigo.shade50,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
-              border: Border(bottom: BorderSide(color: Colors.indigo.shade100)),
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            decoration: BoxDecoration(color: AppColors.canvas, borderRadius: AppRadius.control),
             child: Row(
               children: [
-                Icon(Icons.summarize_rounded, color: Colors.indigo.shade600, size: 16),
-                const SizedBox(width: 8),
-                Text(
-                  'INVOICE SUMMARY',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.indigo.shade700,
-                    letterSpacing: 0.8,
+                Text('Total', style: AppText.bodyStrong),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: Text('LKR ${fmt.format(_totalAmount)}', style: AppText.number(22, color: netColor)),
                   ),
-                ),
-                const Spacer(),
-                _infoPill(
-                  icon: Icons.nights_stay_outlined,
-                  label: '$nights nights',
                 ),
               ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                // Room details
-                ..._selectedRooms.map((room) => _summaryRow(
-                  '${room.quantity}× ${room.type} Room',
-                  '',
-                  indent: 0,
-                )),
-                if (_includeDriverRoom)
-                  _summaryRow('1× Driver Room', '', indent: 0),
-                const SizedBox(height: 8),
-                Divider(color: Colors.grey.shade200),
-                const SizedBox(height: 4),
-                _summaryRow(
-                  'Subtotal',
-                  'LKR ${fmt.format(subtotal)}',
-                  bold: true,
-                ),
-                if (_discount > 0)
-                  _summaryRow(
-                    'Standard Discount',
-                    '− LKR ${fmt.format(_discount)}',
-                    valueColor: Colors.red.shade600,
-                  ),
-                if (_additionalDiscount > 0)
-                  _summaryRow(
-                    'Additional Discount',
-                    '− LKR ${fmt.format(_additionalDiscount)}',
-                    valueColor: Colors.red.shade600,
-                  ),
-                if (_totalExtraCharges > 0)
-                  _summaryRow(
-                    'Extra Charges',
-                    '+ LKR ${fmt.format(_totalExtraCharges)}',
-                    valueColor: Colors.blue.shade600,
-                  ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: netColor.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: netColor.withValues(alpha: 0.2)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Text(
-                        'Total',
-                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-                      ),
-                      const Spacer(),
-                      FittedBox(
-                        child: Text(
-                          'LKR ${fmt.format(_totalAmount)}',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 16,
-                            color: netColor,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (_advanceAmount > 0) ...[
-                  const SizedBox(height: 8),
-                  _summaryRow(
-                    'Advance Paid',
-                    'LKR ${fmt.format(_advanceAmount)}',
-                    valueColor: Colors.green.shade600,
-                  ),
-                  _summaryRow(
-                    'Balance Due',
-                    'LKR ${fmt.format(_remainingBalance)}',
-                    bold: true,
-                  ),
-                ],
-              ],
-            ),
-          ),
+          if (_advanceAmount > 0) ...[
+            const SizedBox(height: 10),
+            _summaryRow('Advance paid', 'LKR ${fmt.format(_advanceAmount)}', valueColor: AppColors.success),
+            _summaryRow('Balance due', 'LKR ${fmt.format(_remainingBalance)}', bold: true),
+          ],
         ],
       ),
     );
@@ -1086,27 +874,18 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
     Color? valueColor,
   }) {
     return Padding(
-      padding: EdgeInsets.only(left: indent * 16.0, top: 3, bottom: 3),
+      padding: EdgeInsets.only(left: indent * 16.0, top: 4, bottom: 4),
       child: Row(
         children: [
           Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: bold ? FontWeight.w700 : FontWeight.normal,
-                color: bold ? Colors.black87 : Colors.grey.shade700,
-              ),
-            ),
+            child: Text(label, style: bold ? AppText.bodyStrong.copyWith(fontSize: 14) : AppText.callout),
           ),
           if (value.isNotEmpty)
             Text(
               value,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
-                color: valueColor ?? (bold ? Colors.black87 : Colors.grey.shade600),
-              ),
+              style: AppText.number(14,
+                  weight: bold ? FontWeight.w700 : FontWeight.w500,
+                  color: valueColor ?? (bold ? AppColors.ink : AppColors.ink2)),
             ),
         ],
       ),
@@ -1132,18 +911,14 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                 width: 60,
                 child: Text(
                   'Day ${i + 1}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.indigo.shade700,
-                  ),
+                  style: AppText.bodyStrong.copyWith(fontSize: 13),
                 ),
               ),
               Expanded(
                 flex: 2,
                 child: Text(
                   dayStr,
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  style: AppText.footnote,
                 ),
               ),
               Expanded(
@@ -1215,12 +990,12 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
             // worth showing, along with a one-tap way back.
             Row(
               children: [
-                Icon(Icons.info_outline_rounded, size: 13, color: Colors.orange.shade700),
+                const Icon(Icons.info_outline_rounded, size: 14, color: AppColors.warning),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     'Rooms quoted fit $auto adults',
-                    style: TextStyle(fontSize: 11.5, color: Colors.orange.shade800),
+                    style: AppText.footnote.copyWith(color: AppColors.warning),
                   ),
                 ),
                 InkWell(
@@ -1233,11 +1008,7 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     child: Text(
                       'Reset',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.indigo.shade600,
-                      ),
+                      style: AppText.footnote.copyWith(fontWeight: FontWeight.w700, color: AppColors.ink),
                     ),
                   ),
                 ),
@@ -1246,42 +1017,24 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
           else
             Row(
               children: [
-                Icon(Icons.info_outline_rounded, size: 13, color: Colors.grey.shade500),
+                const Icon(Icons.info_outline_rounded, size: 14, color: AppColors.ink3),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     'Adults comes from the rooms above; edit it if the party differs. '
                     'Kids are counted separately and shown on the invoice.',
-                    style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
+                    style: AppText.footnote,
                   ),
                 ),
               ],
             ),
           if (kids > 0) ...[
             const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-              decoration: BoxDecoration(
-                color: Colors.indigo.shade50,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.groups_rounded, size: 14, color: Colors.indigo.shade600),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Total in party: ${_adultsEntered + kids} '
-                    '($_adultsEntered adult${_adultsEntered == 1 ? '' : 's'}, '
-                    '$kids kid${kids == 1 ? '' : 's'})',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.indigo.shade700,
-                    ),
-                  ),
-                ],
-              ),
+            StatusPill(
+              'Party of ${_adultsEntered + kids} · '
+              '$_adultsEntered adult${_adultsEntered == 1 ? '' : 's'}, '
+              '$kids kid${kids == 1 ? '' : 's'}',
+              icon: Icons.groups_outlined,
             ),
           ],
         ],
@@ -1291,12 +1044,6 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
 
   Widget _card({required Widget child}) {
     return Card(
-      elevation: 0,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: Colors.grey.shade200),
-      ),
       child: Padding(padding: const EdgeInsets.all(16), child: child),
     );
   }
@@ -1316,21 +1063,7 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
       keyboardType: keyboardType,
       validator: validator,
       onChanged: onChanged,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon, color: Colors.indigo.shade400, size: 20),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Colors.grey.shade200),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: Colors.indigo, width: 2),
-        ),
-        filled: true,
-        fillColor: Colors.grey.shade50,
-      ),
+      decoration: fieldDecoration(label, icon: icon),
     );
   }
 
@@ -1340,85 +1073,38 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
     required VoidCallback onTap,
     bool isRequired = false,
   }) {
-    return GestureDetector(
+    final hasDate = date != null;
+    return Pressable(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      pressedScale: 0.98,
+      child: AnimatedContainer(
+        duration: AppMotion.fast,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: date != null ? Colors.indigo.shade50 : Colors.grey.shade50,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: date != null ? Colors.indigo.shade200 : Colors.grey.shade200,
-          ),
+          color: hasDate ? AppColors.surface : AppColors.canvas,
+          borderRadius: AppRadius.control,
+          border: Border.all(color: hasDate ? AppColors.ink : AppColors.hairlineStrong),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text(label.toUpperCase(), style: AppText.eyebrow.copyWith(fontSize: 10)),
+            const SizedBox(height: 6),
             Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: date != null ? Colors.indigo.shade500 : Colors.grey.shade500,
-                letterSpacing: 0.3,
-              ),
+              hasDate ? DateFormat('EEE d MMM').format(date) : 'Select date',
+              style: hasDate ? AppText.bodyStrong : AppText.body.copyWith(color: AppColors.ink4),
+              overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Icon(
-                  Icons.calendar_today_outlined,
-                  size: 14,
-                  color: date != null ? Colors.indigo.shade600 : Colors.grey.shade400,
-                ),
-                const SizedBox(width: 6),
-                Flexible(
-                  child: Text(
-                    date != null
-                        ? DateFormat('d MMM yyyy').format(date)
-                        : 'Tap to set',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: date != null
-                          ? Colors.indigo.shade800
-                          : Colors.grey.shade400,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
+            if (hasDate)
+              Text(DateFormat('yyyy').format(date), style: AppText.footnote.copyWith(fontSize: 12)),
           ],
         ),
       ),
     );
   }
 
-  Widget _infoPill({required IconData icon, required String label}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: Colors.indigo.shade50,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: Colors.indigo.shade600),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Colors.indigo.shade700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _infoPill({required IconData icon, required String label}) =>
+      StatusPill(label, icon: icon);
 
   Widget _toggleRow({
     required IconData icon,
@@ -1430,45 +1116,30 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
     required void Function(bool) onChanged,
   }) {
     return InkWell(
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: AppRadius.control,
       onTap: () => onChanged(!value),
-      child: Container(
+      child: AnimatedContainer(
+        duration: AppMotion.fast,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: value ? iconBg.withValues(alpha: 0.5) : Colors.grey.shade50,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: value ? iconColor.withValues(alpha: 0.3) : Colors.grey.shade200,
-          ),
+          color: AppColors.surface,
+          borderRadius: AppRadius.control,
+          border: Border.all(color: value ? AppColors.ink : AppColors.hairline),
         ),
         child: Row(
           children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(8)),
-              child: Icon(icon, color: iconColor, size: 17),
-            ),
-            const SizedBox(width: 10),
+            IconWell(icon, size: 34, color: value ? iconColor : null),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title,
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                  Text(subtitle,
-                      style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                  Text(title, style: AppText.bodyStrong.copyWith(fontSize: 14)),
+                  Text(subtitle, style: AppText.footnote.copyWith(fontSize: 12)),
                 ],
               ),
             ),
-            Transform.scale(
-              scale: 0.85,
-              child: Switch(
-                value: value,
-                activeColor: iconColor,
-                onChanged: onChanged,
-              ),
-            ),
+            Switch(value: value, onChanged: onChanged),
           ],
         ),
       ),
@@ -1480,9 +1151,8 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
       borderRadius: BorderRadius.circular(8),
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Icon(icon, size: 18,
-            color: onTap != null ? Colors.indigo : Colors.grey.shade300),
+        padding: const EdgeInsets.all(10),
+        child: Icon(icon, size: 18, color: onTap != null ? AppColors.ink : AppColors.ink4),
       ),
     );
   }
@@ -1686,12 +1356,11 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           title: Row(
             children: [
-              Icon(Icons.check_circle_rounded, color: Colors.green.shade600),
+              const Icon(Icons.check_circle_rounded, color: AppColors.success),
               const SizedBox(width: 8),
-              const Text('Invoice Ready'),
+              const Text('Invoice ready'),
             ],
           ),
           content: SizedBox(
@@ -1707,14 +1376,7 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                       child: ElevatedButton.icon(
                         icon: const Icon(Icons.ios_share_rounded, size: 18),
                         label: const Text('Share PDF'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green.shade600,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
+                        style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
                         onPressed: () async {
                           final ok = await file_saver.sharePdfLast();
                           if (!ok && mounted) {
@@ -1723,8 +1385,6 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                                 content: const Text(
                                   'Sharing is not supported in this browser. Use Open PDF instead.',
                                 ),
-                                backgroundColor: Colors.orange.shade700,
-                                behavior: SnackBarBehavior.floating,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10),
                                 ),
@@ -1743,8 +1403,7 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                         icon: const Icon(Icons.picture_as_pdf_rounded, size: 18),
                         label: const Text('Open PDF'),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.indigo,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          minimumSize: const Size.fromHeight(48),
                         ),
                         onPressed: () => file_saver.openPdfUrl(pdfUrl),
                       ),
@@ -1756,11 +1415,9 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                     width: double.infinity,
                     child: OutlinedButton.icon(
                       icon: const Icon(Icons.hotel_rounded, size: 18),
-                      label: const Text('Add Booking to System'),
+                      label: const Text('Add as booking'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.green.shade700,
-                        side: BorderSide(color: Colors.green.shade300),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        minimumSize: const Size.fromHeight(48),
                       ),
                       onPressed: () {
                         Navigator.of(ctx).pop();
@@ -1776,21 +1433,16 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                   const SizedBox(height: 16),
                   Text(
                     'WHATSAPP MESSAGE',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.grey.shade600,
-                      letterSpacing: 1.0,
-                    ),
+                    style: AppText.eyebrow,
                   ),
                   const SizedBox(height: 8),
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.grey.shade200),
+                      color: AppColors.canvas,
+                      borderRadius: AppRadius.control,
+                      border: Border.all(color: AppColors.hairline),
                     ),
                     child: SelectableText(
                       message,
@@ -1802,23 +1454,14 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       icon: const Icon(Icons.copy_rounded, size: 18),
-                      label: const Text('Copy Message'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.indigo,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
+                      label: const Text('Copy message'),
+                      style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
                       onPressed: () async {
                         await Clipboard.setData(ClipboardData(text: message));
                         if (!mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: const Text('Message copied to clipboard'),
-                            backgroundColor: Colors.green.shade600,
-                            behavior: SnackBarBehavior.floating,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -1843,12 +1486,7 @@ class _GenerateInvoiceScreenState extends State<GenerateInvoiceScreen> {
   }
 }
 
-Widget _sectionLabel(String text) => Text(
-      text.toUpperCase(),
-      style: TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w700,
-        color: Colors.grey.shade500,
-        letterSpacing: 1.1,
-      ),
+Widget _sectionLabel(String text) => Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Text(text.toUpperCase(), style: AppText.eyebrow),
     );
