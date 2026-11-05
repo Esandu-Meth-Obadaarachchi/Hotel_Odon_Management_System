@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:odon_booking/shared/widgets/odon_ui.dart';
 import 'package:odon_booking/core/api/api_service.dart';
 import 'package:odon_booking/features/ai_insights/ai_insights_page.dart';
 
@@ -122,7 +123,7 @@ class _CalculateProfitPageState extends State<CalculateProfitPage> {
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
           colorScheme: const ColorScheme.light(
-            primary: Colors.indigo,
+            primary: AppColors.ink,
             onPrimary: Colors.white,
           ),
         ),
@@ -156,279 +157,118 @@ class _CalculateProfitPageState extends State<CalculateProfitPage> {
 
   @override
   Widget build(BuildContext context) {
-    final days      = _endDate.difference(_startDate).inDays + 1;
-    final isProfit  = totalProfit >= 0;
-    final resultColor = isProfit ? const Color(0xFF16A34A) : const Color(0xFFDC2626);
+    final days = _endDate.difference(_startDate).inDays + 1;
+    final isProfit = totalProfit >= 0;
+    final resultColor = isProfit ? AppColors.success : AppColors.danger;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF312E81), Color(0xFF4F46E5)],
-            ),
-          ),
-        ),
-        title: const Text(
-          'Profit Summary',
-          style: TextStyle(
-            fontFamily: 'Outfit',
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text('Profit'),
         actions: [
           TextButton.icon(
             onPressed: _selectDateRange,
-            icon: const Icon(Icons.date_range_rounded, color: Colors.white, size: 18),
-            label: const Text(
-              'Range',
-              style: TextStyle(color: Colors.white, fontFamily: 'Outfit'),
-            ),
+            icon: const Icon(Icons.date_range_rounded, size: 18),
+            label: const Text('Range'),
           ),
+          const SizedBox(width: 8),
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.indigo))
+          ? const LoadingView(label: 'Adding up the numbers…')
           : SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-
-                  // ── Date range pill ──────────────────────────────────
-                  GestureDetector(
-                    onTap: _selectDateRange,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.grey.shade200),
+              padding: const EdgeInsets.only(top: 16, bottom: 32),
+              child: PageBody(
+                maxWidth: AppLayout.maxForm,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // ── Range ─────────────────────────────────────────────
+                    Pressable(
+                      onTap: _selectDateRange,
+                      pressedScale: 0.98,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: AppRadius.control,
+                          border: Border.all(color: AppColors.hairlineStrong),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.calendar_today_outlined, size: 16, color: AppColors.ink3),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text('${_fmtDate(_startDate)}  –  ${_fmtDate(_endDate)}',
+                                  style: AppText.bodyStrong.copyWith(fontSize: 14)),
+                            ),
+                            StatusPill('$days day${days != 1 ? 's' : ''}'),
+                          ],
+                        ),
                       ),
-                      child: Row(
+                    ),
+                    const SizedBox(height: 16),
+
+                    // ── Net result ────────────────────────────────────────
+                    SurfaceCard(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.calendar_today_outlined,
-                              size: 15, color: Colors.indigo.shade400),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              '${_fmtDate(_startDate)}  –  ${_fmtDate(_endDate)}',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF1E1B4B),
-                              ),
-                            ),
+                          Text(isProfit ? 'NET PROFIT' : 'NET LOSS',
+                              style: AppText.eyebrow.copyWith(color: resultColor)),
+                          const SizedBox(height: 8),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(_fmtLkr(totalProfit), style: AppText.number(40, color: resultColor)),
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade100,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              '$days day${days != 1 ? 's' : ''}',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey.shade600,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Icon(Icons.edit_calendar_outlined,
-                              size: 15, color: Colors.grey.shade400),
+                          const SizedBox(height: 14),
+                          Wrap(spacing: 16, runSpacing: 6, children: [
+                            _countBadge(Icons.hotel_outlined, _bookingsForSelectedRange.length, 'bookings'),
+                            _countBadge(Icons.receipt_outlined, _expensesForSelectedRange.length, 'expenses'),
+                            _countBadge(Icons.people_outline_rounded, _salariesForSelectedRange.length, 'salaries'),
+                          ]),
                         ],
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
+                    const SizedBox(height: 12),
 
-                  // ── Net result hero ──────────────────────────────────
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.grey.shade200),
+                    // ── Statement ─────────────────────────────────────────
+                    SurfaceCard(
+                      padding: EdgeInsets.zero,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _ledgerSectionHeader('INCOME'),
+                          _ledgerRow(label: 'Booking revenue', amount: totalRevenue, bold: true),
+                          _ledgerRow(label: 'Advance collected', amount: totalAdvance, indent: 1),
+                          _ledgerRow(label: 'Balance due', amount: totalBalance, indent: 1),
+                          if (totalBankBalance > 0)
+                            _ledgerRow(label: 'by bank transfer', amount: totalBankBalance, indent: 2, small: true),
+                          if (totalCashBalance > 0)
+                            _ledgerRow(label: 'in cash', amount: totalCashBalance, indent: 2, small: true),
+                          _ledgerDivider(),
+                          _ledgerSectionHeader('OUTGOINGS'),
+                          _ledgerRow(label: 'Expenses', amount: totalExpenses, bold: true, negate: true),
+                          _ledgerRow(label: 'Salaries', amount: totalSalaries, bold: true, negate: true),
+                          _ledgerDivider(thick: true),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 14, 20, 18),
+                            child: Row(
+                              children: [
+                                Text('Net', style: AppText.headline),
+                                const Spacer(),
+                                Text('${isProfit ? '' : '−'}${_fmtLkr(totalProfit)}',
+                                    style: AppText.number(18, color: resultColor)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        // Left accent stripe
-                        Container(
-                          width: 4,
-                          height: 64,
-                          margin: const EdgeInsets.only(right: 16),
-                          decoration: BoxDecoration(
-                            color: resultColor,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                isProfit ? 'NET PROFIT' : 'NET LOSS',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: resultColor,
-                                  letterSpacing: 1.2,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              FittedBox(
-                                fit: BoxFit.scaleDown,
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  _fmtLkr(totalProfit),
-                                  style: TextStyle(
-                                    fontFamily: 'Outfit',
-                                    fontSize: 34,
-                                    fontWeight: FontWeight.w800,
-                                    color: resultColor,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        // Count badges
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            _countBadge(Icons.hotel_rounded,
-                                _bookingsForSelectedRange.length, Colors.indigo),
-                            const SizedBox(height: 6),
-                            _countBadge(Icons.receipt_outlined,
-                                _expensesForSelectedRange.length, Colors.pink.shade400),
-                            const SizedBox(height: 6),
-                            _countBadge(Icons.people_outline_rounded,
-                                _salariesForSelectedRange.length, Colors.orange),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
+                    const SizedBox(height: 16),
 
-                  // ── Ledger statement card ────────────────────────────
-                  Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.grey.shade200),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-
-                        // — Income section —
-                        _ledgerSectionHeader('INCOME'),
-                        _ledgerRow(
-                          label: 'Booking Revenue',
-                          amount: totalRevenue,
-                          color: const Color(0xFF16A34A),
-                          bold: true,
-                        ),
-                        _ledgerRow(
-                          label: 'Advance collected',
-                          amount: totalAdvance,
-                          color: Colors.grey.shade700,
-                          indent: 1,
-                        ),
-                        _ledgerRow(
-                          label: 'Balance due',
-                          amount: totalBalance,
-                          color: Colors.grey.shade700,
-                          indent: 1,
-                        ),
-                        if (totalBankBalance > 0)
-                          _ledgerRow(
-                            label: 'via Bank Transfer',
-                            amount: totalBankBalance,
-                            color: Colors.grey.shade500,
-                            indent: 2,
-                            small: true,
-                          ),
-                        if (totalCashBalance > 0)
-                          _ledgerRow(
-                            label: 'via Cash',
-                            amount: totalCashBalance,
-                            color: Colors.grey.shade500,
-                            indent: 2,
-                            small: true,
-                          ),
-
-                        _ledgerDivider(),
-
-                        // — Deductions section —
-                        _ledgerSectionHeader('DEDUCTIONS'),
-                        _ledgerRow(
-                          label: 'Expenses',
-                          amount: totalExpenses,
-                          color: const Color(0xFFDC2626),
-                          bold: true,
-                          negate: true,
-                        ),
-                        _ledgerRow(
-                          label: 'Salaries',
-                          amount: totalSalaries,
-                          color: const Color(0xFFEA580C),
-                          bold: true,
-                          negate: true,
-                        ),
-
-                        _ledgerDivider(thick: true),
-
-                        // — Net —
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 14, 20, 18),
-                          child: Row(
-                            children: [
-                              const Text(
-                                'Net',
-                                style: TextStyle(
-                                  fontFamily: 'Outfit',
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF1E1B4B),
-                                ),
-                              ),
-                              const Spacer(),
-                              Text(
-                                '${isProfit ? '' : '−'}${_fmtLkr(totalProfit)}',
-                                style: TextStyle(
-                                  fontFamily: 'Outfit',
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w800,
-                                  color: resultColor,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // ── AI button ────────────────────────────────────────
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton.icon(
+                    OutlinedButton.icon(
                       onPressed: () => Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -445,69 +285,43 @@ class _CalculateProfitPageState extends State<CalculateProfitPage> {
                           ),
                         ),
                       ),
-                      icon: const Icon(Icons.psychology_rounded, size: 18),
-                      label: const Text(
-                        'AI Business Insights',
-                        style: TextStyle(
-                          fontFamily: 'Outfit',
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF4F46E5),
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                      ),
+                      style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+                      icon: const Icon(Icons.auto_awesome_outlined, size: 18),
+                      label: const Text('Business insights'),
                     ),
-                  ),
-                  const SizedBox(height: 24),
+                    const SizedBox(height: 28),
 
-                  // ── Detail tabs ──────────────────────────────────────
-                  DefaultTabController(
-                    length: 3,
-                    child: Column(
-                      children: [
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: Colors.grey.shade200),
-                          ),
-                          child: TabBar(
-                            labelColor: Colors.indigo,
-                            unselectedLabelColor: Colors.grey,
-                            indicatorColor: Colors.indigo,
-                            indicatorSize: TabBarIndicatorSize.tab,
-                            dividerColor: Colors.transparent,
-                            labelStyle: const TextStyle(
-                              fontFamily: 'Outfit',
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12,
+                    // ── Detail ────────────────────────────────────────────
+                    DefaultTabController(
+                      length: 3,
+                      child: Builder(
+                        builder: (ctx) => Column(
+                          children: [
+                            SegmentedTabs(
+                              controller: DefaultTabController.of(ctx),
+                              labels: [
+                                'Bookings ${_bookingsForSelectedRange.length}',
+                                'Expenses ${_expensesForSelectedRange.length}',
+                                'Salaries ${_salariesForSelectedRange.length}',
+                              ],
                             ),
-                            tabs: [
-                              Tab(text: 'Bookings (${_bookingsForSelectedRange.length})'),
-                              Tab(text: 'Expenses (${_expensesForSelectedRange.length})'),
-                              Tab(text: 'Salaries (${_salariesForSelectedRange.length})'),
-                            ],
-                          ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              height: 360,
+                              child: TabBarView(
+                                children: [
+                                  _buildBookingsList(),
+                                  _buildList(_expensesForSelectedRange, isExpense: true),
+                                  _buildList(_salariesForSelectedRange, isExpense: false),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
-                        SizedBox(
-                          height: 320,
-                          child: TabBarView(
-                            children: [
-                              _buildBookingsList(),
-                              _buildList(_expensesForSelectedRange, isExpense: true),
-                              _buildList(_salariesForSelectedRange, isExpense: false),
-                            ],
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
     );
@@ -515,218 +329,121 @@ class _CalculateProfitPageState extends State<CalculateProfitPage> {
 
   // ── Ledger components ──────────────────────────────────────────────────────
 
-  Widget _ledgerSectionHeader(String label) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.2,
-          color: Colors.grey.shade400,
-        ),
-      ),
-    );
-  }
+  Widget _ledgerSectionHeader(String label) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+        child: Text(label, style: AppText.eyebrow.copyWith(fontSize: 10)),
+      );
 
-  Widget _ledgerDivider({bool thick = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Divider(
-        height: thick ? 1 : 1,
-        thickness: thick ? 1.5 : 0.8,
-        color: thick ? Colors.grey.shade300 : Colors.grey.shade200,
-      ),
-    );
-  }
+  Widget _ledgerDivider({bool thick = false}) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+        child: Divider(color: thick ? AppColors.hairlineStrong : AppColors.hairline),
+      );
 
   Widget _ledgerRow({
     required String label,
     required double amount,
-    required Color color,
     int indent = 0,
-    bool bold  = false,
+    bool bold = false,
     bool small = false,
     bool negate = false,
   }) {
-    final leftPad   = 20.0 + indent * 16.0;
-    final fontSize  = small ? 12.5 : (bold ? 14.5 : 13.5);
-    final amtPrefix = negate ? '−' : '';
-
+    final leftPad = 20.0 + indent * 16.0;
+    final size = small ? 13.0 : 14.5;
     return Padding(
       padding: EdgeInsets.fromLTRB(leftPad, 6, 20, 6),
       child: Row(
         children: [
-          if (indent > 0) ...[
-            Container(
-              width: 3,
-              height: 3,
-              margin: const EdgeInsets.only(right: 6),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade400,
-                shape: BoxShape.circle,
-              ),
-            ),
-          ],
           Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: fontSize,
-                fontWeight: bold ? FontWeight.w600 : FontWeight.w400,
-                color: bold ? const Color(0xFF1E1B4B) : Colors.grey.shade600,
-              ),
-            ),
+            child: Text(label,
+                style: bold
+                    ? AppText.bodyStrong.copyWith(fontSize: size)
+                    : AppText.callout.copyWith(fontSize: size, color: AppColors.ink3)),
           ),
           Text(
-            '$amtPrefix${_fmtLkr(amount)}',
-            style: TextStyle(
-              fontSize: fontSize,
-              fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
-              color: color,
-            ),
+            '${negate ? '−' : ''}${_fmtLkr(amount)}',
+            style: AppText.number(size,
+                weight: bold ? FontWeight.w700 : FontWeight.w500,
+                color: bold ? AppColors.ink : AppColors.ink2),
           ),
         ],
       ),
     );
   }
 
-  Widget _countBadge(IconData icon, int count, Color color) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 13, color: color),
-        const SizedBox(width: 4),
-        Text(
-          count.toString(),
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade600),
-        ),
-      ],
-    );
-  }
+  Widget _countBadge(IconData icon, int count, String label) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: AppColors.ink3),
+          const SizedBox(width: 5),
+          Text('$count $label', style: AppText.footnote.copyWith(color: AppColors.ink2)),
+        ],
+      );
 
   // ── Detail list builders ───────────────────────────────────────────────────
 
+  Widget _rows(int count, Widget Function(int) row) => SingleChildScrollView(
+        child: SurfaceCard(
+          shadow: false,
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(children: [
+            for (var i = 0; i < count; i++) ...[
+              if (i > 0) const Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: Divider()),
+              row(i),
+            ],
+          ]),
+        ),
+      );
+
+  Widget _row(String title, String sub, double amount) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: AppText.bodyStrong.copyWith(fontSize: 14), overflow: TextOverflow.ellipsis),
+                  if (sub.isNotEmpty) Text(sub, style: AppText.footnote.copyWith(fontSize: 12)),
+                ],
+              ),
+            ),
+            Text(_fmtLkr(amount), style: AppText.number(14)),
+          ],
+        ),
+      );
+
   Widget _buildBookingsList() {
     if (_bookingsForSelectedRange.isEmpty) {
-      return _emptyState(Icons.event_busy_rounded, 'No bookings');
+      return _emptyState(Icons.event_busy_outlined, 'No bookings in this range');
     }
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(0, 8, 0, 8),
-      itemCount: _bookingsForSelectedRange.length,
-      itemBuilder: (_, i) => _buildBookingCard(_bookingsForSelectedRange[i]),
-    );
+    return _rows(_bookingsForSelectedRange.length, (i) {
+      final booking = _bookingsForSelectedRange[i];
+      final isNew = booking['rooms'] != null && (booking['rooms'] as List).isNotEmpty;
+      final roomLabel = isNew
+          ? (booking['rooms'] as List).cast<Map<String, dynamic>>().map((r) => '${r['roomNumber']}').join(', ')
+          : '${booking['roomNumber'] ?? '?'}';
+      final guest = (booking['guestName'] ?? '').toString().trim();
+      final total = double.tryParse(booking['total'].toString()) ?? 0;
+      return _row(guest.isEmpty ? 'Room $roomLabel' : guest,
+          '${(booking['package'] ?? '').toString()} · Room $roomLabel', total);
+    });
   }
 
   Widget _buildList(List<Map<String, dynamic>> items, {required bool isExpense}) {
     if (items.isEmpty) {
       return _emptyState(
         isExpense ? Icons.receipt_long_outlined : Icons.people_outline,
-        isExpense ? 'No expenses' : 'No salaries',
+        isExpense ? 'No expenses in this range' : 'No salaries in this range',
       );
     }
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(0, 8, 0, 8),
-      itemCount: items.length,
-      itemBuilder: (_, i) {
-        final item   = items[i];
-        final amount = double.tryParse(item['amount'].toString()) ?? 0;
-        final name   = isExpense ? (item['expenseName'] ?? '–') : (item['employeeName'] ?? '–');
-        final sub    = isExpense ? (item['category'] ?? '') : (item['salaryType'] ?? '');
-        final color  = isExpense ? Colors.red.shade700 : Colors.orange.shade700;
-
-        return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.grey.shade100),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(name,
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                        overflow: TextOverflow.ellipsis),
-                    if (sub.isNotEmpty)
-                      Text(sub,
-                          style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
-                  ],
-                ),
-              ),
-              Text(
-                'LKR ${amount.toStringAsFixed(0)}',
-                style: TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w700, color: color),
-              ),
-            ],
-          ),
-        );
-      },
-    );
+    return _rows(items.length, (i) {
+      final item = items[i];
+      final amount = double.tryParse(item['amount'].toString()) ?? 0;
+      final name = isExpense ? (item['expenseName'] ?? '–') : (item['employeeName'] ?? '–');
+      final sub = isExpense ? (item['category'] ?? '') : (item['salaryType'] ?? '');
+      return _row(name.toString(), sub.toString(), amount);
+    });
   }
 
-  Widget _buildBookingCard(Map<String, dynamic> booking) {
-    final isNew = booking['rooms'] != null &&
-        (booking['rooms'] as List).isNotEmpty;
-    final roomLabel = isNew
-        ? (booking['rooms'] as List)
-            .cast<Map<String, dynamic>>()
-            .map((r) => 'Rm ${r['roomNumber']}')
-            .join(', ')
-        : 'Room ${booking['roomNumber'] ?? '?'}';
-    final total = double.tryParse(booking['total'].toString()) ?? 0;
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade100),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(roomLabel,
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                    overflow: TextOverflow.ellipsis),
-                if ((booking['package'] ?? '').toString().isNotEmpty)
-                  Text(
-                    booking['package'],
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
-                  ),
-              ],
-            ),
-          ),
-          Text(
-            'LKR ${total.toStringAsFixed(0)}',
-            style: const TextStyle(
-                fontSize: 13, fontWeight: FontWeight.w700, color: Colors.indigo),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _emptyState(IconData icon, String label) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 44, color: Colors.grey.shade300),
-          const SizedBox(height: 8),
-          Text(label, style: TextStyle(fontSize: 13, color: Colors.grey.shade400)),
-        ],
-      ),
-    );
-  }
+  Widget _emptyState(IconData icon, String label) => EmptyState(icon: icon, title: label);
 }

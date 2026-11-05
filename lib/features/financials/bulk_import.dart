@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:odon_booking/shared/widgets/odon_ui.dart';
 
 /// Allowed salary types (must match the Salary form + edit dialog dropdowns).
 const List<String> kSalaryTypes = ['OT', 'Monthly', 'Weekly', 'Commission'];
@@ -152,7 +153,7 @@ Future<List<Map<String, dynamic>>?> showBulkImportPasteDialog(BuildContext conte
           return AlertDialog(
             title: const Text(
               'Paste JSON from Claude',
-              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.indigo),
+              style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.ink),
             ),
             content: SizedBox(
               width: double.maxFinite,
@@ -163,7 +164,7 @@ Future<List<Map<String, dynamic>>?> showBulkImportPasteDialog(BuildContext conte
                   Text(
                     'Paste the JSON block Claude gave you for the month, then '
                     'review the entries before saving.',
-                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                    style: TextStyle(fontSize: 13, color: AppColors.ink3),
                   ),
                   const SizedBox(height: 14),
                   TextField(
@@ -174,13 +175,6 @@ Future<List<Map<String, dynamic>>?> showBulkImportPasteDialog(BuildContext conte
                     decoration: InputDecoration(
                       hintText: '{ "salaries": [...], "expenses": [...] }',
                       alignLabelWithHint: true,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(color: Colors.indigo, width: 2),
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey.shade50,
                     ),
                   ),
                   if (error != null) ...[
@@ -188,12 +182,12 @@ Future<List<Map<String, dynamic>>?> showBulkImportPasteDialog(BuildContext conte
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.error_outline, color: Colors.red, size: 18),
+                        const Icon(Icons.error_outline, color: AppColors.danger, size: 18),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
                             error!,
-                            style: const TextStyle(color: Colors.red, fontSize: 13),
+                            style: const TextStyle(color: AppColors.danger, fontSize: 13),
                           ),
                         ),
                       ],
@@ -209,7 +203,7 @@ Future<List<Map<String, dynamic>>?> showBulkImportPasteDialog(BuildContext conte
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.indigo,
+                  backgroundColor: AppColors.ink,
                   foregroundColor: Colors.white,
                 ),
                 onPressed: () {

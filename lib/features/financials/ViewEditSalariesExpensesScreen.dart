@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:odon_booking/shared/widgets/odon_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:odon_booking/core/api/api_service.dart';
 
@@ -69,7 +71,7 @@ class _ViewEditSalariesExpensesScreenState
     } catch (e) {
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.danger),
       );
     }
   }
@@ -112,15 +114,12 @@ class _ViewEditSalariesExpensesScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Record deleted'),
-          backgroundColor: Colors.green.shade600,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
       _loadRecords();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.danger),
       );
     }
   }
@@ -143,7 +142,7 @@ class _ViewEditSalariesExpensesScreenState
       builder: (_) => StatefulBuilder(
         builder: (ctx, setS) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Edit Salary', style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
+          title: const Text('Edit Salary', style: TextStyle( fontWeight: FontWeight.bold)),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -168,7 +167,7 @@ class _ViewEditSalariesExpensesScreenState
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.indigo, foregroundColor: Colors.white,
+                  backgroundColor: AppColors.ink, foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
               onPressed: () async {
                 try {
@@ -180,13 +179,13 @@ class _ViewEditSalariesExpensesScreenState
                   });
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: const Text('Updated'), backgroundColor: Colors.green.shade600,
+                    SnackBar(content: const Text('Updated'), backgroundColor: AppColors.success,
                         behavior: SnackBarBehavior.floating),
                   );
                   _loadRecords();
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                    SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.danger),
                   );
                 }
               },
@@ -210,7 +209,7 @@ class _ViewEditSalariesExpensesScreenState
       builder: (_) => StatefulBuilder(
         builder: (ctx, setS) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Edit Expense', style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
+          title: const Text('Edit Expense', style: TextStyle( fontWeight: FontWeight.bold)),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -238,7 +237,7 @@ class _ViewEditSalariesExpensesScreenState
                       lastDate: DateTime.now().add(const Duration(days: 365)),
                       builder: (c, child) => Theme(
                         data: Theme.of(c).copyWith(
-                          colorScheme: const ColorScheme.light(primary: Colors.indigo),
+                          colorScheme: const ColorScheme.light(primary: AppColors.ink),
                         ),
                         child: child!,
                       ),
@@ -248,12 +247,12 @@ class _ViewEditSalariesExpensesScreenState
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade300),
+                      border: Border.all(color: AppColors.hairlineStrong),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.calendar_today_outlined, color: Colors.indigo.shade400, size: 18),
+                        Icon(Icons.calendar_today_outlined, color: AppColors.ink3, size: 18),
                         const SizedBox(width: 10),
                         Text('${date.day}/${date.month}/${date.year}'),
                       ],
@@ -269,7 +268,7 @@ class _ViewEditSalariesExpensesScreenState
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.indigo, foregroundColor: Colors.white,
+                  backgroundColor: AppColors.ink, foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
               onPressed: () async {
                 try {
@@ -282,13 +281,13 @@ class _ViewEditSalariesExpensesScreenState
                   });
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: const Text('Updated'), backgroundColor: Colors.green.shade600,
+                    SnackBar(content: const Text('Updated'), backgroundColor: AppColors.success,
                         behavior: SnackBarBehavior.floating),
                   );
                   _loadRecords();
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                    SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.danger),
                   );
                 }
               },
@@ -305,31 +304,24 @@ class _ViewEditSalariesExpensesScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF312E81), Color(0xFF4F46E5)],
-            ),
+        title: const Text('Records'),
+        actions: [
+          IconButton(
+            tooltip: 'Refresh',
+            icon: const Icon(Icons.refresh_rounded),
+            onPressed: _loadRecords,
           ),
-        ),
-        title: const Text(
-          'Records',
-          style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, color: Colors.white),
-        ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
+          const SizedBox(width: 4),
+        ],
       ),
-      body: Column(
+      body: PageBody(
+        maxWidth: AppLayout.maxForm,
+        child: Column(
         children: [
           // ── Filter Panel ──────────────────────────────────────────────────
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+          Padding(
+            padding: const EdgeInsets.only(top: 16),
             child: Column(
               children: [
                 // Type + category row
@@ -396,7 +388,7 @@ class _ViewEditSalariesExpensesScreenState
                     hintText: _selectedType == 'Salaries'
                         ? 'Search by employee name…'
                         : 'Search by expense name…',
-                    prefixIcon: const Icon(Icons.search_rounded, color: Colors.indigo),
+                    prefixIcon: const Icon(Icons.search_rounded),
                     suffixIcon: _searchQuery.isNotEmpty
                         ? IconButton(
                             icon: const Icon(Icons.clear_rounded, size: 18),
@@ -407,17 +399,6 @@ class _ViewEditSalariesExpensesScreenState
                             },
                           )
                         : null,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: Colors.grey.shade200),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: Colors.indigo, width: 2),
-                    ),
-                    filled: true,
-                    fillColor: Colors.grey.shade50,
                     isDense: true,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   ),
@@ -430,61 +411,43 @@ class _ViewEditSalariesExpensesScreenState
             ),
           ),
 
-          // ── Total Banner ──────────────────────────────────────────────────
+          // ── Total ────────────────────────────────────────────────────────
           if (!_isLoading && _filteredRecords.isNotEmpty)
-            Container(
-              margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF312E81), Color(0xFF4F46E5)],
+            Padding(
+              padding: const EdgeInsets.only(top: 14),
+              child: SurfaceCard(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(_buildFilterDescription(), style: AppText.bodyStrong.copyWith(fontSize: 14)),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${_monthNames[int.parse(_selectedMonth) - 1]} $_selectedYear · '
+                            '${_filteredRecords.length} record${_filteredRecords.length != 1 ? 's' : ''}',
+                            style: AppText.footnote,
+                          ),
+                        ],
+                      ),
+                    ),
+                    FittedBox(
+                      child: Text(formatMoney(_calculateTotal()), style: AppText.number(22)),
+                    ),
+                  ],
                 ),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _buildFilterDescription(),
-                        style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${_monthNames[int.parse(_selectedMonth) - 1]} $_selectedYear',
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13),
-                      ),
-                    ],
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      FittedBox(
-                        child: Text(
-                          'LKR ${_calculateTotal().toStringAsFixed(2)}',
-                          style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      Text(
-                        '${_filteredRecords.length} record${_filteredRecords.length != 1 ? 's' : ''}',
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ],
               ),
             ),
 
           // ── List ──────────────────────────────────────────────────────────
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: Colors.indigo))
+                ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
                 : _filteredRecords.isEmpty
                     ? _buildEmptyState()
                     : ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 80),
+                        padding: const EdgeInsets.fromLTRB(0, 12, 0, 32),
                         itemCount: _filteredRecords.length,
                         itemBuilder: (_, i) {
                           final r = _filteredRecords[i];
@@ -496,12 +459,6 @@ class _ViewEditSalariesExpensesScreenState
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _loadRecords,
-        backgroundColor: Colors.indigo,
-        foregroundColor: Colors.white,
-        tooltip: 'Refresh',
-        child: const Icon(Icons.refresh_rounded),
       ),
     );
   }
@@ -511,12 +468,12 @@ class _ViewEditSalariesExpensesScreenState
       context: context,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Delete Record', style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
-        content: const Text('This action cannot be undone.'),
+        title: const Text('Delete this record?'),
+        content: const Text('It will be removed from the totals. This can\'t be undone.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white,
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger, foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
             onPressed: () {
               Navigator.pop(context);
@@ -530,37 +487,23 @@ class _ViewEditSalariesExpensesScreenState
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            _selectedType == 'Salaries' ? Icons.people_outline : Icons.receipt_long_outlined,
-            size: 64,
-            color: Colors.grey.shade300,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            _buildEmptyStateMessage(),
-            style: TextStyle(fontSize: 17, color: Colors.grey.shade500),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '${_monthNames[int.parse(_selectedMonth) - 1]} $_selectedYear',
-            style: TextStyle(fontSize: 13, color: Colors.grey.shade400),
-          ),
-          if (_searchQuery.isNotEmpty || _selectedCategory != 'All') ...[
-            const SizedBox(height: 18),
-            TextButton(
-              onPressed: () {
+    final filtered = _searchQuery.isNotEmpty || _selectedCategory != 'All';
+    return SingleChildScrollView(
+      child: EmptyState(
+        icon: _selectedType == 'Salaries' ? Icons.people_outline : Icons.receipt_long_outlined,
+        title: _buildEmptyStateMessage(),
+        message: '${_monthNames[int.parse(_selectedMonth) - 1]} $_selectedYear',
+        actionLabel: filtered ? 'Clear filters' : null,
+        onAction: filtered
+            ? () {
                 _searchController.clear();
-                setState(() { _searchQuery = ''; _selectedCategory = 'All'; });
+                setState(() {
+                  _searchQuery = '';
+                  _selectedCategory = 'All';
+                });
                 _applyFilters();
-              },
-              child: const Text('Clear Filters', style: TextStyle(color: Colors.indigo)),
-            ),
-          ],
-        ],
+              }
+            : null,
       ),
     );
   }
@@ -589,15 +532,8 @@ class _ViewEditSalariesExpensesScreenState
       value: value,
       isExpanded: true,
       decoration: InputDecoration(
-        prefixIcon: Icon(icon, size: 18, color: Colors.indigo.shade400),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Colors.grey.shade200),
-        ),
+        prefixIcon: Icon(icon, size: 18, color: AppColors.ink3),
         contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-        filled: true,
-        fillColor: Colors.grey.shade50,
         isDense: true,
       ),
       items: items.map((i) => DropdownMenuItem(value: i, child: Text(itemLabel(i), overflow: TextOverflow.ellipsis))).toList(),
@@ -619,95 +555,13 @@ class _SalaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final date = DateTime.parse(salary['date'] ?? salary['createdAt']);
     final amount = double.tryParse(salary['amount'].toString()) ?? 0.0;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
-        children: [
-          // Left accent
-          Container(
-            width: 4,
-            height: 80,
-            decoration: BoxDecoration(
-              color: Colors.indigo,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(12),
-                bottomLeft: Radius.circular(12),
-              ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          // Content
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    salary['employeeName'] ?? 'Unknown Employee',
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      _pill(salary['salaryType'] ?? '', Colors.indigo.shade50, Colors.indigo.shade700),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${date.day}/${date.month}/${date.year}',
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          // Amount + actions
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  'LKR ${amount.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: Colors.indigo,
-                  ),
-                ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.edit_outlined, size: 18, color: Colors.indigo),
-                      onPressed: onEdit,
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: Icon(Icons.delete_outline_rounded, size: 18, color: Colors.red.shade400),
-                      onPressed: onDelete,
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+    return _RecordRow(
+      title: salary['employeeName'] ?? 'Unknown employee',
+      tag: (salary['salaryType'] ?? '').toString(),
+      date: date,
+      amount: amount,
+      onEdit: onEdit,
+      onDelete: onDelete,
     );
   }
 }
@@ -719,115 +573,82 @@ class _ExpenseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final date   = DateTime.parse(expense['date']);
+    final date = DateTime.parse(expense['date']);
     final amount = double.tryParse(expense['amount'].toString()) ?? 0.0;
-    final reason = expense['reason']?.toString() ?? '';
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Left accent (rose for expenses — semantic)
-          Container(
-            width: 4,
-            constraints: const BoxConstraints(minHeight: 80),
-            decoration: BoxDecoration(
-              color: Colors.pink.shade400,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(12),
-                bottomLeft: Radius.circular(12),
-              ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    expense['expenseName'] ?? 'Unknown Expense',
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      _pill(expense['category'] ?? '', Colors.pink.shade50, Colors.pink.shade700),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${date.day}/${date.month}/${date.year}',
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                      ),
-                    ],
-                  ),
-                  if (reason.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      reason,
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 8, top: 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  'LKR ${amount.toStringAsFixed(2)}',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: Colors.pink.shade700,
-                  ),
-                ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.edit_outlined, size: 18, color: Colors.indigo),
-                      onPressed: onEdit,
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: Icon(Icons.delete_outline_rounded, size: 18, color: Colors.red.shade400),
-                      onPressed: onDelete,
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+    return _RecordRow(
+      title: expense['expenseName'] ?? 'Unknown expense',
+      tag: (expense['category'] ?? '').toString(),
+      date: date,
+      amount: amount,
+      note: expense['reason']?.toString() ?? '',
+      onEdit: onEdit,
+      onDelete: onDelete,
     );
   }
 }
 
-Widget _pill(String label, Color bg, Color fg) => Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
-      child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: fg)),
+String formatMoney(double v) => 'LKR ${NumberFormat('#,##0.##').format(v)}';
+
+class _RecordRow extends StatelessWidget {
+  final String title, tag;
+  final DateTime date;
+  final double amount;
+  final String note;
+  final VoidCallback onEdit, onDelete;
+
+  const _RecordRow({
+    required this.title,
+    required this.tag,
+    required this.date,
+    required this.amount,
+    this.note = '',
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: SurfaceCard(
+        shadow: false,
+        padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: AppText.bodyStrong, overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 4),
+                  Text(
+                    [if (tag.isNotEmpty) tag, DateFormat('d MMM yyyy').format(date)].join(' · '),
+                    style: AppText.footnote,
+                  ),
+                  if (note.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(note, style: AppText.footnote.copyWith(fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ],
+                ],
+              ),
+            ),
+            Text(formatMoney(amount), style: AppText.number(15)),
+            const SizedBox(width: 4),
+            PopupMenuButton<String>(
+              tooltip: 'More',
+              icon: const Icon(Icons.more_vert_rounded, color: AppColors.ink3, size: 20),
+              onSelected: (v) => v == 'edit' ? onEdit() : onDelete(),
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'edit', child: Text('Edit')),
+                PopupMenuItem(value: 'delete', child: Text('Delete', style: TextStyle(color: AppColors.danger))),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
+  }
+}
 
 TextField _dialogField(
   TextEditingController ctrl,
@@ -845,16 +666,5 @@ TextField _dialogField(
 
 InputDecoration _dialogDeco(String label, IconData icon) => InputDecoration(
       labelText: label,
-      prefixIcon: Icon(icon, color: Colors.indigo.shade400, size: 20),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: Colors.grey.shade200),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: Colors.indigo, width: 2),
-      ),
-      filled: true,
-      fillColor: Colors.grey.shade50,
+      prefixIcon: Icon(icon, size: 20),
     );

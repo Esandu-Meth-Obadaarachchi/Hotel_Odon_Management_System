@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:odon_booking/shared/widgets/odon_ui.dart';
 import 'package:odon_booking/core/api/api_service.dart';
 
 class RoomConfigScreen extends StatefulWidget {
@@ -58,43 +59,32 @@ class _RoomConfigScreenState extends State<RoomConfigScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Room Configuration',
-          style: TextStyle(color: Colors.white, fontFamily: 'Outfit', fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: Colors.indigo,
-        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text('Room setup'),
         actions: [
           _isSaving
               ? const Padding(
                   padding: EdgeInsets.all(16),
-                  child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)),
+                  child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
                 )
-              : TextButton(
-                  onPressed: _saveConfig,
-                  child: const Text('Save', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                ),
+              : TextButton(onPressed: _saveConfig, child: const Text('Save')),
+          const SizedBox(width: 8),
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const LoadingView()
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              padding: AppLayout.sliverPadding(context, maxWidth: AppLayout.maxForm, top: 16, bottom: 32),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _buildLegend(),
-                  const SizedBox(height: 20),
                   if (groundRooms.isNotEmpty) ...[
-                    _buildFloorHeader('Ground Floor'),
-                    const SizedBox(height: 10),
-                    ...groundRooms.map((r) => _buildRoomRow(r)),
-                    const SizedBox(height: 20),
+                    _buildFloorHeader('Ground floor'),
+                    _buildFloor(groundRooms),
                   ],
                   if (upperRooms.isNotEmpty) ...[
-                    _buildFloorHeader('Upper Floor'),
-                    const SizedBox(height: 10),
-                    ...upperRooms.map((r) => _buildRoomRow(r)),
+                    _buildFloorHeader('Upper floor'),
+                    _buildFloor(upperRooms),
                   ],
                 ],
               ),
@@ -102,106 +92,79 @@ class _RoomConfigScreenState extends State<RoomConfigScreen> {
     );
   }
 
-  Widget _buildLegend() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.indigo.shade50,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.indigo.shade100),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Room Type Guide', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.indigo, fontSize: 14)),
-          const SizedBox(height: 6),
-          const Text('Double: 2 pax  |  Double + extra bed → Triple: 3 pax', style: TextStyle(fontSize: 13)),
-          const Text('Family: 4 pax  |  Family + extra bed → Family Plus: 5 pax', style: TextStyle(fontSize: 13)),
-          const SizedBox(height: 6),
-          const Text('Blocked rooms cannot be selected when adding bookings.', style: TextStyle(fontSize: 12, color: Colors.grey)),
-        ],
-      ),
-    );
-  }
+  Widget _buildLegend() => const InlineBanner(
+        'Double sleeps 2 (3 with an extra bed). Family sleeps 4 (5 with an extra bed). '
+        'Blocked rooms can\'t be picked for new bookings.',
+      );
 
-  Widget _buildFloorHeader(String label) {
-    return Text(
-      label,
-      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.indigo),
-    );
-  }
+  Widget _buildFloorHeader(String label) => FormSectionLabel(label);
+
+  Widget _buildFloor(List<Map<String, dynamic>> rooms) => SurfaceCard(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(children: [
+          for (var i = 0; i < rooms.length; i++) ...[
+            if (i > 0) const Padding(padding: EdgeInsets.only(left: 76), child: Divider()),
+            _buildRoomRow(rooms[i]),
+          ],
+        ]),
+      );
 
   Widget _buildRoomRow(Map<String, dynamic> room) {
     final index = _rooms.indexWhere((r) => r['roomNumber'] == room['roomNumber']);
     final isBlocked = room['isBlocked'] == true;
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        child: Row(
-          children: [
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                color: isBlocked ? Colors.red.shade50 : Colors.indigo.shade50,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      room['roomNumber'].toString().padLeft(3, '0'),
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                        color: isBlocked ? Colors.red : Colors.indigo,
-                      ),
-                    ),
-                    if (isBlocked)
-                      Icon(Icons.lock, size: 12, color: Colors.red.shade400),
-                  ],
-                ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Row(
+        children: [
+          AnimatedContainer(
+            duration: AppMotion.fast,
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: isBlocked ? AppColors.blocked : AppColors.sunken,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    room['roomNumber'].toString().padLeft(3, '0'),
+                    style: AppText.number(14, color: isBlocked ? Colors.white : AppColors.ink),
+                  ),
+                  if (isBlocked) const Icon(Icons.lock_rounded, size: 11, color: Colors.white70),
+                ],
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: DropdownButtonFormField<String>(
-                value: room['baseType'] as String,
-                decoration: InputDecoration(
-                  labelText: 'Base Type',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                ),
-                items: ['Family', 'Double']
-                    .map((t) => DropdownMenuItem(value: t, child: Text(t)))
-                    .toList(),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: ChoiceChipGroup(
+              items: const ['Double', 'Family'],
+              value: room['baseType'] as String?,
+              onChanged: (val) {
+                if (val != null && index >= 0) {
+                  setState(() => _rooms[index]['baseType'] = val);
+                }
+              },
+            ),
+          ),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Switch(
+                value: isBlocked,
+                trackColor: WidgetStateProperty.resolveWith(
+                    (s) => s.contains(WidgetState.selected) ? AppColors.blocked : AppColors.hairlineStrong),
                 onChanged: (val) {
-                  if (val != null && index >= 0) {
-                    setState(() => _rooms[index]['baseType'] = val);
-                  }
+                  if (index >= 0) setState(() => _rooms[index]['isBlocked'] = val);
                 },
               ),
-            ),
-            const SizedBox(width: 8),
-            Column(
-              children: [
-                Text('Blocked', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
-                Switch(
-                  value: isBlocked,
-                  onChanged: (val) {
-                    if (index >= 0) setState(() => _rooms[index]['isBlocked'] = val);
-                  },
-                  activeColor: Colors.red,
-                ),
-              ],
-            ),
-          ],
-        ),
+              Text('Blocked', style: AppText.footnote.copyWith(fontSize: 11)),
+            ],
+          ),
+        ],
       ),
     );
   }
