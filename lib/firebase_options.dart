@@ -60,7 +60,7 @@ class DefaultFirebaseOptions {
     appId: '1:54906570613:web:9e8530ba8381686cd6b53c',
     messagingSenderId: '54906570613',
     projectId: 'odon-dashboard-fin',
-    authDomain: 'odon-dashboard-fin.firebaseapp.com',
+    authDomain: 'admin.hoteltheodon.com',
     storageBucket: 'odon-dashboard-fin.firebasestorage.app',
   );
 

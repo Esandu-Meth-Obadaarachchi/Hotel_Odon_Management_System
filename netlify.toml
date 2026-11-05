@@ -5,6 +5,21 @@
 [build]
   publish = "build/web"
 
+# Firebase Auth helper proxy. authDomain is set to this site's own domain (admin.hoteltheodon.com) so the
+# Google sign-in popup/redirect is same-site; otherwise browsers with partitioned
+# storage (Android Chrome, Safari) lose the auth state ("missing initial state").
+[[redirects]]
+  from = "/__/auth/*"
+  to = "https://odon-dashboard-fin.firebaseapp.com/__/auth/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/__/firebase/*"
+  to = "https://odon-dashboard-fin.firebaseapp.com/__/firebase/:splat"
+  status = 200
+  force = true
+
 # SPA fallback — route every path back to index.html so deep links
 # and refreshes don't 404.
 [[redirects]]
